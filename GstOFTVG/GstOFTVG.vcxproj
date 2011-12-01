@@ -46,6 +46,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>Libraries\gst-lib\gstreamer-0.10.lib;Libraries\gst-lib\glib-2.0.lib;Libraries\gst-lib\gobject-2.0.lib;Libraries\gst-lib\gstbase-0.10.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ModuleDefinitionFile>GstOFTVG.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

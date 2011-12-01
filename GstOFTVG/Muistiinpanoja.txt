@@ -1,0 +1,9 @@
+Libraries.zip pit‰‰ purkaa ennen k‰‰nt‰mist‰. Se sis‰lt‰‰ OSSBuildsin mukana tulevat gstreamer-kirjastot, jotta niihin voi viitata suhteellisilla poluilla absoluuttisten sijaan.
+
+
+
+Esimerkkikomento pluginin testaukseen:
+
+Ajetaan siell‰ hakemistossa, mihin GstOFTVG.dll on k‰‰nnetty:
+
+gst-launch --gst-plugin-load=GstOFTVG.dll filesrc location=big_buck_bunny_1080p_h264.mov ! decodebin ! oftvg ! autovideosink
