@@ -60,7 +60,6 @@ enum
 
 /* the capabilities of the inputs and outputs.
  *
- * FIXME:describe the real formats here.
  */
 static GstStaticPadTemplate sink_template =
 GST_STATIC_PAD_TEMPLATE (
@@ -82,10 +81,9 @@ GST_STATIC_PAD_TEMPLATE (
 
 /* debug category for fltering log messages
  *
- * FIXME:exchange the string 'Template oftvg' with your description
  */
 #define DEBUG_INIT(bla) \
-  GST_DEBUG_CATEGORY_INIT (gst_oftvg_debug, "oftvg", 0, "Test Video Generator");
+  GST_DEBUG_CATEGORY_INIT (gst_oftvg_debug, "oftvg", 0, "OptoFidelity Test Video Generator");
 
 GST_BOILERPLATE_FULL (GstOFTVG, gst_oftvg, GstBaseTransform,
     GST_TYPE_BASE_TRANSFORM, DEBUG_INIT);
@@ -191,9 +189,6 @@ gst_oftvg_transform_ip(GstBaseTransform * base, GstBuffer *buf)
 
   if (filter->silent == FALSE)
     g_print ("I'm plugged, therefore I'm in.\n");
-  
-  /* FIXME: do something interesting here.  This simply copies the source
-   * to the destination. */
   
   width = filter->width;
   height = filter->height;
