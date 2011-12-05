@@ -21,7 +21,8 @@
 /**
  * SECTION:element-oftvg
  *
- * OFTVG is an overlay frame id marker.
+ * OFTVG (OptoFidelity Test Video Generator) is a filter that adds overlay
+ * frame id markings to each frame.
  *
  * <refsect2>
  * <title>Example launch line</title>
