@@ -42,10 +42,11 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>Libraries\gst-include;Libraries\gst-include\glib-2.0;Libraries\gst-include\gstreamer-0.10;Libraries\gst-include\libxml2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>GST_DISABLE_GST_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Libraries\gst-lib\gstreamer-0.10.lib;Libraries\gst-lib\glib-2.0.lib;Libraries\gst-lib\gobject-2.0.lib;Libraries\gst-lib\gstbase-0.10.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Libraries\gst-lib\gstreamer-0.10.lib;Libraries\gst-lib\glib-2.0.lib;Libraries\gst-lib\gobject-2.0.lib;Libraries\gst-lib\gstbase-0.10.lib;Libraries\gst-lib\gstvideo-0.10.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ModuleDefinitionFile>GstOFTVG.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
@@ -56,12 +57,13 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>Libraries\gst-include;Libraries\gst-include\glib-2.0;Libraries\gst-include\gstreamer-0.10;Libraries\gst-include\libxml2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>GST_DISABLE_GST_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>Libraries\gst-lib\gstreamer-0.10.lib;Libraries\gst-lib\glib-2.0.lib;Libraries\gst-lib\gobject-2.0.lib;Libraries\gst-lib\gstbase-0.10.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Libraries\gst-lib\gstreamer-0.10.lib;Libraries\gst-lib\glib-2.0.lib;Libraries\gst-lib\gobject-2.0.lib;Libraries\gst-lib\gstbase-0.10.lib;Libraries\gst-lib\gstvideo-0.10.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

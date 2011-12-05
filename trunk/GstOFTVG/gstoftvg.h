@@ -1,7 +1,6 @@
-/* 
- * GStreamer
- * Copyright (C) 2006 Stefan Kost <ensonic@users.sf.net>
- * Copyright (C) 2011  <<user@hostname.org>>
+/*
+ * Test Video Generator
+ * Copyright (C) 2011 OptoFidelity <info@optofidelity.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -23,6 +22,7 @@
 #define __GST_OFTVG_H__
 
 #include <gst/gst.h>
+#include <gst/video/video.h>
 #include <gst/base/gstbasetransform.h>
 
 G_BEGIN_DECLS
@@ -45,6 +45,21 @@ struct _GstOFTVG {
   GstBaseTransform element;
 
   gboolean silent;
+
+  /* caps */
+  GstVideoFormat in_format;
+  GstVideoFormat out_format;
+  gint width;
+  gint height;
+
+  /* properties */
+  guint8 bit_off_color[4];
+  guint8 bit_on_color[4];
+
+  /* processing function */
+  void (*process_inplace)(guint8 *buf, GstOFTVG *filter);
+
+  /* precalculated values */
 };
 
 struct _GstOFTVGClass {
