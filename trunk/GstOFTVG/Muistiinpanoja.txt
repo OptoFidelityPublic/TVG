@@ -7,3 +7,23 @@ Esimerkkikomento pluginin testaukseen:
 Ajetaan siell‰ hakemistossa, mihin GstOFTVG.dll on k‰‰nnetty:
 
 gst-launch --gst-plugin-load=GstOFTVG.dll filesrc location=big_buck_bunny_1080p_h264.mov ! decodebin ! oftvg ! autovideosink
+
+
+--
+
+Use GST_ELEMENT_ERROR when reporting fatal errors if bitmap
+cannot be loaded.
+
+
+--
+
+7.12.2011
+
+gstreamermm is C++ bindings for gstreamer.
+gstreamermm is not currently available for Visual Studio.
+
+http://mail.gnome.org/archives/gtkmm-list/2011-August/msg00038.html
+http://mail.gnome.org/archives/gtkmm-list/2011-August/msg00040.html
+
+--
+
