@@ -20,10 +20,17 @@ cannot be loaded.
 7.12.2011
 
 gstreamermm is C++ bindings for gstreamer.
+
+http://ftp.gnome.org/pub/GNOME/sources/gstreamermm/0.10/
+
 gstreamermm is not currently available for Visual Studio.
 
 http://mail.gnome.org/archives/gtkmm-list/2011-August/msg00038.html
 http://mail.gnome.org/archives/gtkmm-list/2011-August/msg00040.html
 
 --
+
+8.12.2011
+
+gst-launch.exe --gst-plugin-path=../Debug filesrc location=../../GstOFTVG/Media/big_buck_bunny_1080p_h264.mov ! decodebin ! oftvg ! autovideosink
 
