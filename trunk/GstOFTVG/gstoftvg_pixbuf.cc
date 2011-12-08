@@ -166,8 +166,6 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
       p += n_channels * ((gst_oftvg_BITS_PER_SAMPLE + 7) / 8);
     }
   }
-
-  g_print("Debug2: %d %d : %d", width, height, layout->length());
 }
 
 void gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,

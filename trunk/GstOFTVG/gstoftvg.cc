@@ -209,7 +209,8 @@ gst_oftvg_transform_ip(GstBaseTransform * base, GstBuffer *buf)
   {
     filter->layout.clear();
 
-    const gchar* filename = "../layout/test-layout-1920x1080-b.png";
+    const gchar* filename = "../layout/test-layout-1920x1080-c.bmp";
+      //"../layout/test-layout-1920x1080-b.png";
     int width = 1920;
     int height = 1080;
     GError* error = NULL;
@@ -217,7 +218,7 @@ gst_oftvg_transform_ip(GstBaseTransform * base, GstBuffer *buf)
 
     if (error != NULL)
     {
-      GST_ELEMENT_ERROR(filter, RESOURCE, OPEN_READ, (NULL), ("Could not open layout file: %s.", filename));
+      GST_ELEMENT_ERROR(filter, RESOURCE, OPEN_READ, (NULL), ("Could not open layout file: %s. %s", filename, error->message));
       return GST_FLOW_ERROR;
     }
   }

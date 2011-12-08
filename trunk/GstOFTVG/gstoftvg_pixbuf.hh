@@ -27,7 +27,8 @@
 
 G_BEGIN_DECLS
 
-typedef struct
+// Layout element.
+struct GstOFTVGElement
 {
   int x;
   int y;
@@ -38,17 +39,27 @@ typedef struct
   guint8 frameid_n;
   // Whether this element is sync id element which will not be paused.
   gboolean isSyncMark;
-} GstOFTVGElement;
+};
 
 class GstOFTVGLayout
 {
 public:
+  // Constructs a new layout object.
   GstOFTVGLayout();
 
+  // Clears the layout.
   void clear();
+
+  // Adds an element to the layout.
   void addElement(const GstOFTVGElement& element);
+  
+  // Adds a pixel to the layout.
   void addPixel(int x, int y, int frameid_n, gboolean isSyncMark);
+  
+  // Returns the number of elements.
   int length() const;
+
+  // Returns the list of elements.
   const GstOFTVGElement* elements() const;
 
 protected:
