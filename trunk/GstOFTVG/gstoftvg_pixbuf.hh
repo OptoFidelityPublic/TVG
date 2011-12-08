@@ -21,24 +21,54 @@
 #ifndef __GSTOFTVG_PIXBUF_H__
 #define __GSTOFTVG_PIXBUF_H__
 
+#include <vector>
+
 #include <gst/gst.h>
 #include <gst/video/video.h>
 #include <gst/base/gstbasetransform.h>
 
 G_BEGIN_DECLS
 
+class GstOFTVGLayout;
+
 /// Layout element.
-struct GstOFTVGElement
+class GstOFTVGElement
 {
-  int x;
-  int y;
-  int width;
-  int height;
-  // frameid_n == 1 (swap state on every frame)
-  // frameid_n == 2 (swap state on every other frame)
-  guint8 frameid_n;
-  // Whether this element is sync id element which will not be paused.
-  gboolean isSyncMark;
+public:
+  GstOFTVGElement(int x, int y, int width, int height,
+    gboolean isSyncMark, int offset, int period, int duty);
+
+  GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
+    gboolean isSyncMark, int frameid_n);
+
+  // Implicit copy constructor works.
+  inline const int& x() const { return x_; }
+  inline const int& y() const { return y_; }
+  inline const int& width() const { return width_; }
+  inline const int& height() const { return height_; }
+
+  inline gboolean isBitOn(int frame_number) const
+  {
+    return ((frame_number + (period_ - offset_)) % period_) >= duty_;
+  }
+
+  /// Returns whether the properties apart from location and
+  /// size equal to element b.
+  gboolean propertiesEqual(const GstOFTVGElement& b) const;
+private:
+  int x_;
+  int y_;
+  int width_;
+  int height_;
+
+  int offset_;
+  int period_;
+  int duty_;
+
+  /// Whether this element is sync id element which will not be paused.
+  gboolean isSyncMark_;
+
+  friend class GstOFTVGLayout;
 };
 
 class GstOFTVGLayout
@@ -68,13 +98,7 @@ protected:
   GstOFTVGElement& last();
 
 private:
-  /// Elements buffer. May be NULL.
-  GstOFTVGElement* elements_;
-  /// Number of elements.
-  int n_elements;
-  /// Capacity of current elements buffer. How many elements
-  /// will fit.
-  int capacity;
+  std::vector<GstOFTVGElement> elements_;
 };
 
 /**

@@ -246,11 +246,13 @@ static void gst_oftvg_init_params(GstOFTVG* filter)
     g_print("gst_oftvg_init_params()\n");
   }
 
+  // Y, U, V
   filter->bit_on_color[0] = 255;
   filter->bit_on_color[1] = 128;
   filter->bit_on_color[2] = 128;
   filter->bit_on_color[3] = 0;
 
+  // Y, U, V
   filter->bit_off_color[0] = 0;
   filter->bit_off_color[1] = 128;
   filter->bit_off_color[2] = 128;
@@ -326,14 +328,16 @@ void gst_oftvg_process_planar_yuv(guint8 *buf, GstOFTVG* filter)
     {
       const GstOFTVGElement& element = filter->layout.elements()[i];
 
-      guint8* posY = bufY + element.y * y_stride;
-      guint8* posU = bufU + (element.y >> v_subs) * uv_stride;
-      guint8* posV = bufV + (element.y >> v_subs) * uv_stride;
-      for (int dy = 0; dy < element.height; dy++)
+      guint8* posY = bufY + element.y() * y_stride;
+      guint8* posU = bufU + (element.y() >> v_subs) * uv_stride;
+      guint8* posV = bufV + (element.y() >> v_subs) * uv_stride;
+
+      gboolean bit_on = element.isBitOn(frame_number);
+      const guint8* color = bit_on ? bit_on_color : bit_off_color;
+
+      for (int dy = 0; dy < element.height(); dy++)
       {
-        gboolean bit_on = (((frame_number << 1) >> element.frameid_n) & 1) != 0;
-        const guint8* color = bit_on ? bit_on_color : bit_off_color;
-        for (int dx = element.x; dx < element.x + element.width; dx++)
+        for (int dx = element.x(); dx < element.x() + element.width(); dx++)
         {
           posY[dx] = color[0];
           posU[dx>>h_subs] = color[1];

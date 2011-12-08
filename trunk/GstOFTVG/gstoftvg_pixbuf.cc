@@ -34,85 +34,87 @@
 #include "timemeasure.h"
 
 const static int gst_oftvg_BITS_PER_SAMPLE = 8;
-const static int gst_oftvg_layout_DEFAULT_CAPACITY = 8;
 
-// Initializes GstOFTVGElement.
-static void gst_oftvg_element_init(GstOFTVGElement* element, guint8 frameid_n, gboolean isSyncMark,
-  int x, int y, int width, int height)
+GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
+    gboolean isSyncMark, int offset, int period, int duty)
+: x_(x), y_(y), width_(width), height_(height),
+    isSyncMark_(isSyncMark), offset_(offset), period_(period), duty_(duty)
 {
-  element->frameid_n = frameid_n;
-  element->isSyncMark = isSyncMark;
-  element->x = x;
-  element->y = y;
-  element->width = width;
-  element->height = height;
+}
+
+GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
+    gboolean isSyncMark, int frameid_n)
+: x_(x), y_(y), width_(width), height_(height),
+    isSyncMark_(isSyncMark), offset_(0), period_(1 << frameid_n), duty_(1 << frameid_n - 1)
+{
+}
+
+/// Returns whether the properties apart from location and
+/// size equal to element b.
+gboolean GstOFTVGElement::propertiesEqual(const GstOFTVGElement& b) const
+{
+  const GstOFTVGElement& a = *this;
+  return a.offset_ == b.offset_ && a.period_ == b.period_ && a.duty_ == b.duty_
+    && a.isSyncMark_ == b.isSyncMark_;
 }
 
 GstOFTVGLayout::GstOFTVGLayout()
-   : elements_(NULL), n_elements(0), capacity(0)
+   : elements_()
 {
 }
 
 
 void GstOFTVGLayout::addPixel(int x, int y, int frameid_n, gboolean isSyncMark)
 {
+  int width = 1;
+  int height = 1;
+  GstOFTVGElement element(x, y, width, height, isSyncMark, frameid_n);
+
   if (length() > 0)
   {
     GstOFTVGElement& prev = last();
 
-    if (prev.y == y && x >= prev.x && x < prev.x + prev.width)
+    if (prev.y() == y && x >= prev.x() && x < prev.x() + prev.width())
     {
       // There is a pixel here already.
       return;
     }
-    else if (prev.y == y && prev.x == x - prev.width && prev.frameid_n == frameid_n
-      && prev.height == 1 && prev.isSyncMark == isSyncMark)
+    else if (prev.y() == y && prev.x() == x - prev.width()
+      && prev.propertiesEqual(element))
     {
       // Combine to previous element. Assume we are adding pixels from
       // left to right.
-      last().width++;
+      last().width_ += element.width();
       return;
     }
   }
   // Create new element.
-  int width = 1;
-  int height = 1;
-  GstOFTVGElement element;
-  gst_oftvg_element_init(&element, frameid_n, isSyncMark, x, y, width, height);
   addElement(element);
 }
 
 void GstOFTVGLayout::clear()
 {
-  this->n_elements = 0;
+  if (elements_.size() > 0)
+  {
+    elements_.clear();
+  }
 }
 
 void GstOFTVGLayout::addElement(const GstOFTVGElement& element)
 {
   GstOFTVGLayout* layout = this;
-  if (layout->elements_ == NULL || layout->n_elements == layout->capacity)
-  {
-    layout->capacity = layout->capacity * 2;
-    if (layout->capacity == 0)
-    {
-      layout->capacity = gst_oftvg_layout_DEFAULT_CAPACITY;
-    }
-    
-    layout->elements_ = (GstOFTVGElement*)
-        realloc(layout->elements_, layout->capacity * sizeof(GstOFTVGElement));
-  }
   // Copy element
-  layout->elements_[layout->n_elements++] = element;
+  layout->elements_.push_back(element);
 }
 
 int GstOFTVGLayout::length() const
 {
-  return n_elements;
+  return elements_.size();
 }
 
 const GstOFTVGElement* GstOFTVGLayout::elements() const
 {
-  return elements_;
+  return &elements_[0];
 }
 
 GstOFTVGElement& GstOFTVGLayout::last()
@@ -152,7 +154,8 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
         {
           int frameid_n = val / 10;
           gboolean isSyncMark = false;
-          layout->addPixel(x * target_width / width, y * target_height / height, frameid_n, isSyncMark);
+          layout->addPixel(x * target_width / width,
+            y * target_height / height, frameid_n, isSyncMark);
         }
       }
       else
@@ -165,10 +168,8 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
           {
             int frameid_n = i + 1;
             gboolean isSyncMark = true;
-            layout->addPixel(x * target_width / width, y * target_height / height, frameid_n, isSyncMark);
-            g_print("%d %d : %d %d -> %d %d\n", target_width, target_height,
-              x, y,
-              x * target_width / width, y * target_height / height);
+            layout->addPixel(x * target_width / width,
+              y * target_height / height, frameid_n, isSyncMark);
           }
         }
       }
