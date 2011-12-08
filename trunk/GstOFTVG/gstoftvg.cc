@@ -1,5 +1,5 @@
 /*
- * Test Video Generator
+ * OptoFidelity Test Video Generator
  * Copyright (C) 2011 OptoFidelity <info@optofidelity.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -36,11 +36,14 @@
 #include "config.h"
 #endif
 
+#define DO_TIMING 1
+
 #include <gst/gst.h>
 #include <gst/base/gstbasetransform.h>
 #include <gst/video/video.h>
 
-#include "gstoftvg.h"
+#include "gstoftvg.hh"
+#include "timemeasure.h"
 
 GST_DEBUG_CATEGORY_STATIC (gst_oftvg_debug);
 #define GST_CAT_DEFAULT gst_oftvg_debug
@@ -96,7 +99,9 @@ static void gst_oftvg_get_property (GObject * object, guint prop_id,
 static GstFlowReturn gst_oftvg_transform_ip (GstBaseTransform * base,
     GstBuffer * outbuf);
 
-gboolean gst_oftvg_set_caps(GstBaseTransform* btrans, GstCaps* incaps, GstCaps* outcaps);
+static gboolean gst_oftvg_set_caps(GstBaseTransform* btrans, GstCaps* incaps, GstCaps* outcaps);
+
+static gboolean gst_oftvg_set_process_function(GstOFTVG* filter);
 
 /* GObject vmethod implementations */
 
@@ -107,14 +112,21 @@ gst_oftvg_base_init (gpointer klass)
 
   gst_element_class_set_details_simple (element_class,
     "OFTVG",
-    "Generic/Filter",
-    "Test Video Generator",
+    "Filter/Editor/Video",
+    "Overlays buffer timestamps on a video stream",
     "OptoFidelity <info@optofidelity.com>");
 
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&src_template));
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&sink_template));
+}
+
+static guint32 gst_oftvg_get_frame_number(GstOFTVG* filter)
+{
+  // TODO: implement really
+  static int frame_count = 0;
+  return frame_count++;
 }
 
 /* initialize the oftvg's class */
@@ -142,6 +154,11 @@ static void
 gst_oftvg_init (GstOFTVG *filter, GstOFTVGClass * klass)
 {
   filter->silent = FALSE;
+
+  if (!filter->silent)
+  {
+    g_print("GstOFTVG initialized.\n");
+  }
 }
 
 static void
@@ -184,12 +201,27 @@ static GstFlowReturn
 gst_oftvg_transform_ip(GstBaseTransform * base, GstBuffer *buf)
 {
   GstOFTVG *filter = GST_OFTVG (base);
-  gint width;
-  gint height;
+  int width;
+  int height;
 
-  if (filter->silent == FALSE)
-    g_print ("I'm plugged, therefore I'm in.\n");
-  
+  //static int debug_counter = 0;
+  if (filter->layout.length() == 0 /*|| debug_counter++%200==0*/)
+  {
+    filter->layout.clear();
+
+    const gchar* filename = "../layout/test-layout-1920x1080-b.png";
+    int width = 1920;
+    int height = 1080;
+    GError* error = NULL;
+    gst_oftvg_load_layout_bitmap(filename, &error, &filter->layout, width, height);
+
+    if (error != NULL)
+    {
+      GST_ELEMENT_ERROR(filter, RESOURCE, OPEN_READ, (NULL), ("Could not open layout file: %s.", filename));
+      return GST_FLOW_ERROR;
+    }
+  }
+
   width = filter->width;
   height = filter->height;
   filter->process_inplace(GST_BUFFER_DATA(buf), filter);
@@ -210,6 +242,11 @@ oftvg_init (GstPlugin * oftvg)
 
 static void gst_oftvg_init_params(GstOFTVG* filter)
 {
+  if (!filter->silent)
+  {
+    g_print("gst_oftvg_init_params()\n");
+  }
+
   filter->bit_on_color[0] = 255;
   filter->bit_on_color[1] = 128;
   filter->bit_on_color[2] = 128;
@@ -247,28 +284,26 @@ gboolean gst_oftvg_set_caps(GstBaseTransform* object, GstCaps* incaps, GstCaps* 
 
 void gst_oftvg_process_planar_yuv(guint8 *buf, GstOFTVG* filter)
 {
-  const guint8* bit_on_color  = filter->bit_on_color;
-  const guint8* bit_off_color = filter->bit_off_color;
-  gint width = filter->width;
-  gint height = filter->height;
-  int y, x;
-  guint8* bufY;
-  guint8* bufU;
-  guint8* bufV;
-  gint y_stride;
-  gint uv_stride;
-  gint v_subs;
-  gint h_subs;
+  const guint8* const bit_on_color  = filter->bit_on_color;
+  const guint8* const bit_off_color = filter->bit_off_color;
+  const int width = filter->width;
+  const int height = filter->height;
+  int v_subs;
+  int h_subs;
 
-  y_stride  = gst_video_format_get_row_stride(filter->in_format, 0, width);
-  uv_stride = gst_video_format_get_row_stride(filter->in_format, 1, width);
+  timemeasure_t timer1 = begin_timing();
+
+  const int y_stride  = gst_video_format_get_row_stride(filter->in_format, 0, width);
+  const int uv_stride = gst_video_format_get_row_stride(filter->in_format, 1, width);
   g_assert(uv_stride == gst_video_format_get_row_stride(filter->in_format, 2, width));
 
-  bufY = buf;
-  bufU =
+  guint8* const bufY =
+    buf + gst_video_format_get_component_offset(filter->in_format, 0, width, 
+    height);
+  guint8* const bufU =
     buf + gst_video_format_get_component_offset(filter->in_format, 1, width,
     height);
-  bufV =
+  guint8* const bufV =
     buf + gst_video_format_get_component_offset(filter->in_format, 2, width,
     height);
 
@@ -283,38 +318,41 @@ void gst_oftvg_process_planar_yuv(guint8 *buf, GstOFTVG* filter)
       break;
   }
 
-  for (y = 0; y < height; y++)
-  {
-    for (x = 0; x < width; x++)
-    {
-      int boxw = 32;
-      int boxh = 32;
+  const int frame_number = gst_oftvg_get_frame_number(filter);
 
-      // Testing black boxen
-      if (((y % 256) >= 128 && (y % 256) < 128 + boxh) && (x >= 128 && x < 128 + boxw) || (x == 200 && y == 200))
-      {
-        bufY[x]         = bit_on_color[0];
-        bufU[x>>h_subs] = bit_on_color[1];
-        bufV[x>>h_subs] = bit_on_color[2];
-      }
-      // Testing white boxen
-      else if (((y % 256) >= 128 && (y % 256) < 128 + boxh) && (x >= 256 && x < 256 + boxw) || (x == 300 && y == 300))
-      {
-        bufY[x]         = bit_off_color[0];
-        bufU[x>>h_subs] = bit_off_color[1];
-        bufV[x>>h_subs] = bit_off_color[2];
-      }
-      else
-      {
-        // Pass through unchanged.
-      }
-    }
-    bufY += y_stride;
-    if ((y) & (1 << h_subs) != 0)
+  if (filter->layout.length() != 0)
+  {
+    int length = filter->layout.length();
+    for (int i = 0; i < length; ++i)
     {
-      bufU += uv_stride;
-      bufV += uv_stride;
+      const GstOFTVGElement& element = filter->layout.elements()[i];
+
+      guint8* posY = bufY + element.y * y_stride;
+      guint8* posU = bufU + (element.y >> v_subs) * uv_stride;
+      guint8* posV = bufV + (element.y >> v_subs) * uv_stride;
+      for (int dy = 0; dy < element.height; dy++)
+      {
+        gboolean bit_on = (((frame_number << 1) >> element.frameid_n) & 1) != 0;
+        const guint8* color = bit_on ? bit_on_color : bit_off_color;
+        for (int dx = element.x; dx < element.x + element.width; dx++)
+        {
+          posY[dx] = color[0];
+          posU[dx>>h_subs] = color[1];
+          posV[dx>>h_subs] = color[2];
+        }
+        posY += y_stride;
+        if ((dy) & (1 << v_subs) == (1 << v_subs) - 1)
+        {
+          posU += uv_stride;
+          posV += uv_stride;
+        }
+      }
     }
+  }
+
+  if (filter->silent == FALSE)
+  {
+    end_timing(timer1, "gst_oftvg_process_planar_yuv");
   }
 }
 

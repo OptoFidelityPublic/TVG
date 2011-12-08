@@ -1,5 +1,5 @@
 /*
- * Test Video Generator
+ * OptoFidelity Test Video Generator
  * Copyright (C) 2011 OptoFidelity <info@optofidelity.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -25,6 +25,8 @@
 #include <gst/video/video.h>
 #include <gst/base/gstbasetransform.h>
 
+#include "gstoftvg_pixbuf.hh"
+
 G_BEGIN_DECLS
 
 #define GST_TYPE_OFTVG \
@@ -49,17 +51,20 @@ struct _GstOFTVG {
   /* caps */
   GstVideoFormat in_format;
   GstVideoFormat out_format;
-  gint width;
-  gint height;
+  int width;
+  int height;
+
+  GstOFTVGLayout layout;
 
   /* properties */
-  guint8 bit_off_color[4];
-  guint8 bit_on_color[4];
-
+  
   /* processing function */
   void (*process_inplace)(guint8 *buf, GstOFTVG *filter);
 
   /* precalculated values */
+  guint8 bit_off_color[4];
+  guint8 bit_on_color[4];
+
 };
 
 struct _GstOFTVGClass {
