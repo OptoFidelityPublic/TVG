@@ -21,7 +21,7 @@
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
@@ -59,6 +59,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>Libraries\gst-include;Libraries\gst-include\glib-2.0;Libraries\gst-include\gstreamer-0.10;Libraries\gst-include\libxml2;Libraries\gst-include\gtk-2.0;Libraries\gst-include\gdk-pixbuf-2.0;Libraries\gst-include\pango-1.0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>GST_DISABLE_GST_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <OmitFramePointers>true</OmitFramePointers>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -66,6 +67,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>Libraries\gst-lib\gstreamer-0.10.lib;Libraries\gst-lib\glib-2.0.lib;Libraries\gst-lib\gobject-2.0.lib;Libraries\gst-lib\gstbase-0.10.lib;Libraries\gst-lib\gstvideo-0.10.lib;gdk_pixbuf-2.0.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>Libraries/gst-lib</AdditionalLibraryDirectories>
+      <ModuleDefinitionFile>GstOFTVG.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
