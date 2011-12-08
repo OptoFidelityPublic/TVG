@@ -60,10 +60,16 @@ void GstOFTVGLayout::addPixel(int x, int y, int frameid_n, gboolean isSyncMark)
   {
     GstOFTVGElement& prev = last();
 
-    if (prev.y == y && prev.x == x - prev.width && prev.frameid_n == frameid_n
+    if (prev.y == y && x >= prev.x && x < prev.x + prev.width)
+    {
+      // There is a pixel here already.
+      return;
+    }
+    else if (prev.y == y && prev.x == x - prev.width && prev.frameid_n == frameid_n
       && prev.height == 1 && prev.isSyncMark == isSyncMark)
     {
-      // Combine to previous element.
+      // Combine to previous element. Assume we are adding pixels from
+      // left to right.
       last().width++;
       return;
     }
@@ -116,7 +122,7 @@ GstOFTVGElement& GstOFTVGLayout::last()
 }
 
 static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
-  GstOFTVGLayout* layout)
+  GstOFTVGLayout* layout, int target_width, int target_height)
 {
   const int numSyncMarks = 2;
   const int syncMarks[numSyncMarks][3] = {
@@ -146,7 +152,7 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
         {
           int frameid_n = val / 10;
           gboolean isSyncMark = false;
-          layout->addPixel(x, y, frameid_n, isSyncMark);
+          layout->addPixel(x * target_width / width, y * target_height / height, frameid_n, isSyncMark);
         }
       }
       else
@@ -159,7 +165,10 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
           {
             int frameid_n = i + 1;
             gboolean isSyncMark = true;
-            layout->addPixel(x, y, frameid_n, isSyncMark);
+            layout->addPixel(x * target_width / width, y * target_height / height, frameid_n, isSyncMark);
+            g_print("%d %d : %d %d -> %d %d\n", target_width, target_height,
+              x, y,
+              x * target_width / width, y * target_height / height);
           }
         }
       }
@@ -189,7 +198,7 @@ void gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,
     g_assert(NULL);
   }
   
-  gst_oftvg_init_layout_from_bitmap(buf, layout);
+  gst_oftvg_init_layout_from_bitmap(buf, layout, width, height);
   
   gdk_pixbuf_unref(buf);
 }

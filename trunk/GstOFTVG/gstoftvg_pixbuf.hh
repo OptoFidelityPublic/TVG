@@ -27,7 +27,7 @@
 
 G_BEGIN_DECLS
 
-// Layout element.
+/// Layout element.
 struct GstOFTVGElement
 {
   int x;
@@ -44,39 +44,48 @@ struct GstOFTVGElement
 class GstOFTVGLayout
 {
 public:
-  // Constructs a new layout object.
+  /// Constructs a new layout object.
   GstOFTVGLayout();
 
-  // Clears the layout.
+  /// Clears the layout.
   void clear();
 
-  // Adds an element to the layout.
+  /// Adds an element to the layout.
   void addElement(const GstOFTVGElement& element);
   
-  // Adds a pixel to the layout.
+  /// Adds a pixel to the layout.
   void addPixel(int x, int y, int frameid_n, gboolean isSyncMark);
   
-  // Returns the number of elements.
+  /// Returns the number of elements.
   int length() const;
 
-  // Returns the list of elements.
+  /// Returns the list of elements.
   const GstOFTVGElement* elements() const;
 
 protected:
-  // Get last element.
-  // Precondition: length() > 0.
+  /// Get last element.
+  /// Precondition: length() > 0.
   GstOFTVGElement& last();
 
 private:
-  // Elements buffer. May be NULL.
+  /// Elements buffer. May be NULL.
   GstOFTVGElement* elements_;
-  // Number of elements.
+  /// Number of elements.
   int n_elements;
-  // Capacity of current elements buffer. How many elements
-  // will fit.
+  /// Capacity of current elements buffer. How many elements
+  /// will fit.
   int capacity;
 };
 
+/**
+ * Loads layout from a bitmap file.
+ * If there is an error, error will point to the error message.
+ * @param filename name and path of the file
+ * @param error Pointer will be set to the error message if there is an error.
+ * @param layout Pointer to layout.
+ * @param width The target width of the layout.
+ * @param height The target height of the layout.
+ */
 void gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,
   GstOFTVGLayout* layout, int width, int height);
 
