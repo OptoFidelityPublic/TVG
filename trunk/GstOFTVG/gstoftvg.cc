@@ -38,6 +38,8 @@
 
 #define DO_TIMING 1
 
+#include <math.h>
+
 #include <gst/gst.h>
 #include <gst/base/gstbasetransform.h>
 #include <gst/video/video.h>
@@ -70,7 +72,21 @@ GST_STATIC_PAD_TEMPLATE (
   GST_PAD_SINK,
   GST_PAD_ALWAYS,
   GST_STATIC_CAPS(
-    GST_VIDEO_CAPS_YUV("I420") ";" GST_VIDEO_CAPS_YUV("YV12")
+    GST_VIDEO_CAPS_YUV("AYUV") ";"
+    GST_VIDEO_CAPS_YUV("Y444") ";"
+    GST_VIDEO_CAPS_YUV("Y42B") ";"
+    GST_VIDEO_CAPS_YUV("I420") ";"
+    GST_VIDEO_CAPS_YUV("YV12") ";"
+    GST_VIDEO_CAPS_YUV("Y41B") ";"
+    GST_VIDEO_CAPS_YUV("YUY2") ";"
+    GST_VIDEO_CAPS_YUV("YVYU") ";"
+    GST_VIDEO_CAPS_YUV("UYVY") ";"
+    GST_VIDEO_CAPS_RGB  ";"
+    GST_VIDEO_CAPS_RGBx ";"
+    GST_VIDEO_CAPS_xRGB ";"
+    GST_VIDEO_CAPS_BGR  ";"
+    GST_VIDEO_CAPS_BGRx ";"
+    GST_VIDEO_CAPS_xBGR ";"
   )
 );
 
@@ -209,9 +225,13 @@ gst_oftvg_transform_ip(GstBaseTransform * base, GstBuffer *buf)
   {
     filter->layout.clear();
 
-    const gchar* filename = "../layout/test-layout-1920x1080-c.bmp";
+    const gchar* filename = 
+      //"../layout/test-layout-1920x1080-b.png";
+      //"../layout/test-layout-1920x1080-c.bmp";
+      "../layout/test-layout-1920x355-c.bmp";
     GError* error = NULL;
-    gst_oftvg_load_layout_bitmap(filename, &error, &filter->layout, filter->width, filter->height);
+    gst_oftvg_load_layout_bitmap(filename, &error, &filter->layout,
+      filter->width, filter->height);
 
     if (error != NULL)
     {
@@ -241,34 +261,48 @@ oftvg_init (GstPlugin * oftvg)
 
 static void gst_oftvg_init_params(GstOFTVG* filter)
 {
+  const guint8 bit_on_color_yuv[4] = { 255, 128, 128, 0 };
+  const guint8 bit_off_color_yuv[4] = { 0, 128, 128, 0 };
+  const guint8 bit_on_color_rgb[4] = { 255, 255, 255, 0 };
+  const guint8 bit_off_color_rgb[4] = { 0, 0, 0, 0 };
+
   if (!filter->silent)
   {
     g_print("gst_oftvg_init_params()\n");
   }
 
-  // Y, U, V
-  filter->bit_on_color[0] = 255;
-  filter->bit_on_color[1] = 128;
-  filter->bit_on_color[2] = 128;
-  filter->bit_on_color[3] = 0;
+  const guint8* bit_on_color = NULL;
+  const guint8* bit_off_color = NULL;
 
-  // Y, U, V
-  filter->bit_off_color[0] = 0;
-  filter->bit_off_color[1] = 128;
-  filter->bit_off_color[2] = 128;
-  filter->bit_off_color[3] = 0;
+  if (gst_video_format_is_yuv(filter->in_format))
+  {
+    bit_on_color = bit_on_color_yuv;
+    bit_off_color = bit_off_color_yuv;
+  }
+  else
+  {
+    bit_on_color = bit_on_color_rgb;
+    bit_off_color = bit_off_color_rgb;
+  }
+
+  memcpy((void *) &(filter->bit_on_color[0]),
+    bit_on_color, sizeof(guint8)*4);
+  memcpy((void *) &(filter->bit_off_color[0]),
+    bit_off_color, sizeof(guint8)*4);
 }
 
-gboolean gst_oftvg_set_caps(GstBaseTransform* object, GstCaps* incaps, GstCaps* outcaps)
+static gboolean gst_oftvg_set_caps(GstBaseTransform* object,
+  GstCaps* incaps, GstCaps* outcaps)
 {
     GstOFTVG *filter = GST_OFTVG(object);
 
-    if (!gst_video_format_parse_caps(incaps, &filter->in_format, &filter->width, &filter->height)
-      ||
-        !gst_video_format_parse_caps(incaps, &filter->out_format, &filter->width, &filter->height))
+    if (!gst_video_format_parse_caps(incaps, &filter->in_format,
+           &filter->width, &filter->height)
+     || !gst_video_format_parse_caps(incaps, &filter->out_format,
+           &filter->width, &filter->height))
     {
-      GST_WARNING_OBJECT(filter, "Failed to parse caps %" GST_PTR_FORMAT " -> %" GST_PTR_FORMAT,
-        incaps, outcaps);
+      GST_WARNING_OBJECT(filter, "Failed to parse caps %"
+        GST_PTR_FORMAT " -> %" GST_PTR_FORMAT, incaps, outcaps);
       return FALSE;
     }
 
@@ -283,43 +317,68 @@ gboolean gst_oftvg_set_caps(GstBaseTransform* object, GstCaps* incaps, GstCaps* 
     return TRUE;
 }
 
-void gst_oftvg_process_planar_yuv(guint8 *buf, GstOFTVG* filter)
+static int gst_oftvg_integer_log2(int val)
 {
+  int r = 0;
+  while (val >>= 1)
+  {
+    r++;
+  }
+  return r;
+}
+
+/// Gets the amount that x coordinate needs to be shifted to the right
+/// to get a matching coordinate in the component data that is possibly
+/// subsampled.
+static int gst_oftvg_get_subsampling_h_shift(GstVideoFormat format,
+  int component, int width)
+{
+  int val =
+    width / gst_video_format_get_component_width(format, component, width);
+  return gst_oftvg_integer_log2(val);
+}
+
+/// Gets the amount that y coordinate needs to be shifted to the right
+/// to get a matching coordinate in the component data that is possibly
+/// subsampled.
+static int gst_oftvg_get_subsampling_v_shift(GstVideoFormat format,
+  int component, int height)
+{
+  int val =
+    height / gst_video_format_get_component_height(format, component, height);
+  return gst_oftvg_integer_log2(val);
+}
+
+/// The default processing function. gst_oftvg_set_process_function determines
+/// which processing function to use.
+void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter)
+{
+  timemeasure_t timer1 = begin_timing();
+
+  GstVideoFormat format = filter->in_format;
   const guint8* const bit_on_color  = filter->bit_on_color;
   const guint8* const bit_off_color = filter->bit_off_color;
   const int width = filter->width;
   const int height = filter->height;
-  int v_subs;
-  int h_subs;
-
-  timemeasure_t timer1 = begin_timing();
-
-  const int y_stride  = gst_video_format_get_row_stride(filter->in_format, 0, width);
-  const int uv_stride = gst_video_format_get_row_stride(filter->in_format, 1, width);
-  g_assert(uv_stride == gst_video_format_get_row_stride(filter->in_format, 2, width));
 
   guint8* const bufY =
-    buf + gst_video_format_get_component_offset(filter->in_format, 0, width, 
-    height);
+    buf + gst_video_format_get_component_offset(format, 0, width, height);
+  int y_stride  = gst_video_format_get_row_stride(format, 0, width);
+  int yoff = gst_video_format_get_pixel_stride(format, 0);
+  
+  int h_subs = gst_oftvg_get_subsampling_h_shift(format, 1, width);
+  int v_subs = gst_oftvg_get_subsampling_v_shift(format, 1, height);
+
   guint8* const bufU =
-    buf + gst_video_format_get_component_offset(filter->in_format, 1, width,
-    height);
+    buf + gst_video_format_get_component_offset(format, 1, width, height);
   guint8* const bufV =
-    buf + gst_video_format_get_component_offset(filter->in_format, 2, width,
-    height);
+    buf + gst_video_format_get_component_offset(format, 2, width, height);
+  
+  int uv_stride = gst_video_format_get_row_stride(format, 1, width);
+  int uoff = gst_video_format_get_pixel_stride(format, 1);
+  int voff = gst_video_format_get_pixel_stride(format, 2);
 
-  switch (filter->in_format)
-  {
-    case GST_VIDEO_FORMAT_I420:
-    case GST_VIDEO_FORMAT_YV12:
-      v_subs = h_subs = 1; // lg2(2)
-      break;
-    default:
-      g_assert_not_reached();
-      break;
-  }
-
-  const int frame_number = gst_oftvg_get_frame_number(filter);
+  int frame_number = gst_oftvg_get_frame_number(filter);
 
   if (filter->layout.length() != 0)
   {
@@ -328,40 +387,48 @@ void gst_oftvg_process_planar_yuv(guint8 *buf, GstOFTVG* filter)
     {
       const GstOFTVGElement& element = filter->layout.elements()[i];
 
-      guint8* posY = bufY + element.y() * y_stride;
-      guint8* posU = bufU + (element.y() >> v_subs) * uv_stride;
-      guint8* posV = bufV + (element.y() >> v_subs) * uv_stride;
+      guint8* posY = bufY + element.y() * y_stride + element.x() * yoff;
+      guint8* posU = bufU + (element.y() >> v_subs) * uv_stride
+        + (element.x() >> h_subs) * uoff;
+      guint8* posV = bufV + (element.y() >> v_subs) * uv_stride
+        + (element.x() >> h_subs) * voff;
 
       gboolean bit_on = element.isBitOn(frame_number);
       const guint8* color = bit_on ? bit_on_color : bit_off_color;
 
-      for (int dy = 0; dy < element.height(); dy++)
+      for (int dx = 0; dx < element.width(); dx++)
       {
-        for (int dx = element.x(); dx < element.x() + element.width(); dx++)
-        {
-          posY[dx] = color[0];
-          posU[dx>>h_subs] = color[1];
-          posV[dx>>h_subs] = color[2];
-        }
-        posY += y_stride;
-        if ((dy) & (1 << v_subs) == (1 << v_subs) - 1)
-        {
-          posU += uv_stride;
-          posV += uv_stride;
-        }
+        *posY = color[0];
+        posY += yoff;
+      }
+      for (int dx = 0; dx < element.width(); dx += 1 << h_subs)
+      {
+        *posU = color[1];
+        *posV = color[2];
+        posU += uoff;
+        posV += voff;
       }
     }
   }
 
   if (filter->silent == FALSE)
   {
-    end_timing(timer1, "gst_oftvg_process_planar_yuv");
+    end_timing(timer1, "gst_oftvg_process_default");
   }
 }
 
 static gboolean gst_oftvg_set_process_function(GstOFTVG* filter)
 {
-  filter->process_inplace = gst_oftvg_process_planar_yuv;
+  if (gst_video_format_is_yuv(filter->in_format))
+  {
+    //filter->process_inplace = gst_oftvg_process_planar;
+    filter->process_inplace = gst_oftvg_process_default;
+  }
+  else if (gst_video_format_is_rgb(filter->in_format))
+  {
+    filter->process_inplace = gst_oftvg_process_default;
+  }
+  
   return filter->process_inplace != NULL;
 }
 
