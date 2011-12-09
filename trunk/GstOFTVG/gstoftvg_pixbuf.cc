@@ -40,6 +40,9 @@ GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
 : x_(x), y_(y), width_(width), height_(height),
     isSyncMark_(isSyncMark), offset_(offset), period_(period), duty_(duty)
 {
+  // For simplicity only elements of height 1 are currently
+  // implemented for rendering.
+  g_assert(height == 1);
 }
 
 GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
@@ -47,6 +50,9 @@ GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
 : x_(x), y_(y), width_(width), height_(height),
     isSyncMark_(isSyncMark), offset_(0), period_(1 << frameid_n), duty_(1 << frameid_n - 1)
 {
+  // For simplicity only elements of height 1 are currently
+  // implemented for rendering.
+  g_assert(height == 1);
 }
 
 /// Returns whether the properties apart from location and
@@ -82,7 +88,7 @@ void GstOFTVGLayout::addPixel(int x, int y, int frameid_n, gboolean isSyncMark)
     else if (prev.y() == y && prev.x() == x - prev.width()
       && prev.propertiesEqual(element))
     {
-      // Combine to previous element. Assume we are adding pixels from
+      // Combine with previous element. Assume we are adding pixels from
       // left to right.
       last().width_ += element.width();
       return;
@@ -123,8 +129,9 @@ GstOFTVGElement& GstOFTVGLayout::last()
   return elements_[length() - 1];
 }
 
-static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
-  GstOFTVGLayout* layout, int target_width, int target_height)
+static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
+  int x, int y, int width, int height,
+  int red, int green, int blue)
 {
   const int numSyncMarks = 2;
   const int syncMarks[numSyncMarks][3] = {
@@ -132,6 +139,35 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
     { 0, 255, 0}
   };
 
+  if (red == green && green == blue)
+  {
+    int val = red;
+    if (val % 10 == 0 && val >= 10 && val <= 240)
+    {
+      int frameid_n = val / 10;
+      gboolean isSyncMark = false;
+      layout->addPixel(x, y, frameid_n, isSyncMark);
+    }
+  }
+  else
+  {
+    // Check if it's a syncmark.
+    for (int i = 0; i < numSyncMarks; ++i)
+    {
+      if (red == syncMarks[i][0] && green == syncMarks[i][1]
+      && blue == syncMarks[i][2])
+      {
+        int frameid_n = i + 1;
+        gboolean isSyncMark = true;
+        layout->addPixel(x, y, frameid_n, isSyncMark);
+      }
+    }
+  }
+}
+
+static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
+  GstOFTVGLayout* layout)
+{
   int width = gdk_pixbuf_get_width(buf);
   int height = gdk_pixbuf_get_height(buf);
   int bits_per_sample = gdk_pixbuf_get_bits_per_sample(buf);
@@ -147,32 +183,15 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
       int red = p[0];
       int green = p[1];
       int blue = p[2];
-      if (red == green && green == blue)
-      {
-        int val = red;
-        if (val % 10 == 0 && val >= 10 && val <= 240)
-        {
-          int frameid_n = val / 10;
-          gboolean isSyncMark = false;
-          layout->addPixel(x * target_width / width,
-            y * target_height / height, frameid_n, isSyncMark);
-        }
-      }
-      else
-      {
-        // Check if it's a syncmark.
-        for (int i = 0; i < numSyncMarks; ++i)
-        {
-          if (red == syncMarks[i][0] && green == syncMarks[i][1]
-          && blue == syncMarks[i][2])
-          {
-            int frameid_n = i + 1;
-            gboolean isSyncMark = true;
-            layout->addPixel(x * target_width / width,
-              y * target_height / height, frameid_n, isSyncMark);
-          }
-        }
-      }
+      int pixelWidth = 1;
+      int pixelHeight = 1;
+      gst_oftvg_addElementFromRGB(layout,
+            x,
+            y,
+            pixelWidth,
+            pixelHeight,
+            red, green, blue);
+
       p += n_channels * ((gst_oftvg_BITS_PER_SAMPLE + 7) / 8);
     }
   }
@@ -181,26 +200,27 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
 void gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,
   GstOFTVGLayout* layout, int width, int height)
 {
-  GdkPixbuf* buf;
-  *error = NULL;
-  buf = gdk_pixbuf_new_from_file(filename, error);
-  if (buf == NULL)
+  GdkPixbuf* origbuf = gdk_pixbuf_new_from_file(filename, error);
+  if (origbuf == NULL)
   {
     return;
   }
-  if (gdk_pixbuf_get_bits_per_sample(buf) != gst_oftvg_BITS_PER_SAMPLE)
+  if (gdk_pixbuf_get_bits_per_sample(origbuf) != gst_oftvg_BITS_PER_SAMPLE)
   {
-    // TODO: Throw or return error
-    g_assert_not_reached();
+    g_set_error(error, GST_RESOURCE_ERROR, GST_RESOURCE_ERROR_FAILED,
+      ("Layout bitmap is not of expected type."));
+    return;
   }
-  if (gdk_pixbuf_get_colorspace(buf) != GDK_COLORSPACE_RGB)
+  if (gdk_pixbuf_get_colorspace(origbuf) != GDK_COLORSPACE_RGB)
   {
-    // TODO: Throw or return error
-    g_assert(NULL);
+    g_set_error(error, GST_RESOURCE_ERROR, GST_RESOURCE_ERROR_FAILED,
+      ("Layout bitmap is not of expected type."));
+    return;
   }
   
-  gst_oftvg_init_layout_from_bitmap(buf, layout, width, height);
-  
+  GdkPixbuf* buf = gdk_pixbuf_scale_simple(origbuf, width, height, GDK_INTERP_NEAREST);
+  gdk_pixbuf_unref(origbuf);
+
+  gst_oftvg_init_layout_from_bitmap(buf, layout);
   gdk_pixbuf_unref(buf);
 }
-
