@@ -46,8 +46,6 @@ typedef struct _GstOFTVGClass GstOFTVGClass;
 struct _GstOFTVG {
   GstBaseTransform element;
 
-  gboolean silent;
-
   /* caps */
   GstVideoFormat in_format;
   GstVideoFormat out_format;
@@ -57,6 +55,8 @@ struct _GstOFTVG {
   GstOFTVGLayout layout;
 
   /* properties */
+  gboolean silent;
+  gchar* layout_location;
   
   /* processing function */
   void (*process_inplace)(guint8 *buf, GstOFTVG *filter);

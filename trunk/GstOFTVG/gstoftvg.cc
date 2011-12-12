@@ -50,6 +50,11 @@
 GST_DEBUG_CATEGORY_STATIC (gst_oftvg_debug);
 #define GST_CAT_DEFAULT gst_oftvg_debug
 
+const gchar* const DEFAULT_LAYOUT_LOCATION =
+  "../layout/test-layout-1920x1080-c.bmp";
+  //"../layout/test-layout-1920x355-c.bmp";
+  //"../layout/test-layout-1920x1080-b.png";
+
 /* Filter signals and args */
 enum
 {
@@ -61,6 +66,7 @@ enum
 {
   PROP_0,
   PROP_SILENT,
+  PROP_LOCATION
 };
 
 /* the capabilities of the inputs and outputs.
@@ -155,9 +161,13 @@ gst_oftvg_class_init (GstOFTVGClass * klass)
   gobject_class->set_property = gst_oftvg_set_property;
   gobject_class->get_property = gst_oftvg_get_property;
 
-  g_object_class_install_property (gobject_class, PROP_SILENT,
+  g_object_class_install_property(gobject_class, PROP_SILENT,
     g_param_spec_boolean ("silent", "Silent", "Produce verbose output ?",
           FALSE, (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
+  g_object_class_install_property(gobject_class, PROP_LOCATION,
+    g_param_spec_string ("location", "Location", "Layout bitmap file location",
+    DEFAULT_LAYOUT_LOCATION,
+    (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
 
   btrans->transform_ip = GST_DEBUG_FUNCPTR(gst_oftvg_transform_ip);
   btrans->set_caps     = GST_DEBUG_FUNCPTR(gst_oftvg_set_caps);
@@ -170,6 +180,7 @@ static void
 gst_oftvg_init (GstOFTVG *filter, GstOFTVGClass * klass)
 {
   filter->silent = FALSE;
+  filter->layout_location = g_strdup(DEFAULT_LAYOUT_LOCATION);
 
   if (!filter->silent)
   {
@@ -185,10 +196,17 @@ gst_oftvg_set_property (GObject * object, guint prop_id,
 
   switch (prop_id) {
     case PROP_SILENT:
-      filter->silent = g_value_get_boolean (value);
+      filter->silent = g_value_get_boolean(value);
+      break;
+    case PROP_LOCATION:
+      if (filter->layout_location != NULL)
+      {
+        g_free(filter->layout_location);
+      }
+      filter->layout_location = g_value_dup_string(value);
       break;
     default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
       break;
   }
 }
@@ -225,10 +243,7 @@ gst_oftvg_transform_ip(GstBaseTransform * base, GstBuffer *buf)
   {
     filter->layout.clear();
 
-    const gchar* filename = 
-      //"../layout/test-layout-1920x1080-b.png";
-      //"../layout/test-layout-1920x1080-c.bmp";
-      "../layout/test-layout-1920x355-c.bmp";
+    const gchar* filename = filter->layout_location;
     GError* error = NULL;
     gst_oftvg_load_layout_bitmap(filename, &error, &filter->layout,
       filter->width, filter->height);
@@ -349,15 +364,21 @@ static int gst_oftvg_get_subsampling_v_shift(GstVideoFormat format,
   return gst_oftvg_integer_log2(val);
 }
 
-/// The default processing function. gst_oftvg_set_process_function determines
+/// Generic processing function. The color components to use are
+/// determined by filter->color.
+/// Note: gst_oftvg_set_process_function determines
 /// which processing function to use.
 void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter)
 {
   timemeasure_t timer1 = begin_timing();
 
   GstVideoFormat format = filter->in_format;
-  const guint8* const bit_on_color  = filter->bit_on_color;
-  const guint8* const bit_off_color = filter->bit_off_color;
+  guint8 bit_on_color[4];
+  guint8 bit_off_color[4];
+
+  memcpy(bit_on_color, filter->bit_on_color, sizeof(guint8) * 4);
+  memcpy(bit_off_color, filter->bit_off_color, sizeof(guint8) * 4);
+
   const int width = filter->width;
   const int height = filter->height;
 
@@ -396,15 +417,20 @@ void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter)
       gboolean bit_on = element.isBitOn(frame_number);
       const guint8* color = bit_on ? bit_on_color : bit_off_color;
 
+      guint8 y = color[0];
+      guint8 u = color[1];
+      guint8 v = color[2];
+
       for (int dx = 0; dx < element.width(); dx++)
       {
-        *posY = color[0];
+        *posY = y;
         posY += yoff;
       }
+      
       for (int dx = 0; dx < element.width(); dx += 1 << h_subs)
       {
-        *posU = color[1];
-        *posV = color[2];
+        *posU = u;
+        *posV = v;
         posU += uoff;
         posV += voff;
       }
@@ -421,7 +447,6 @@ static gboolean gst_oftvg_set_process_function(GstOFTVG* filter)
 {
   if (gst_video_format_is_yuv(filter->in_format))
   {
-    //filter->process_inplace = gst_oftvg_process_planar;
     filter->process_inplace = gst_oftvg_process_default;
   }
   else if (gst_video_format_is_rgb(filter->in_format))
