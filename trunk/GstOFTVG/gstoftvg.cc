@@ -47,13 +47,22 @@
 #include "gstoftvg.hh"
 #include "timemeasure.h"
 
+#if defined(_MSC_VER)
+#define Restrict __restrict
+#else
+#define Restrict restrict
+#endif
+
 GST_DEBUG_CATEGORY_STATIC (gst_oftvg_debug);
 #define GST_CAT_DEFAULT gst_oftvg_debug
 
-const gchar* const DEFAULT_LAYOUT_LOCATION =
+static const gchar* const DEFAULT_LAYOUT_LOCATION =
   "../layout/test-layout-1920x1080-c.bmp";
   //"../layout/test-layout-1920x355-c.bmp";
   //"../layout/test-layout-1920x1080-b.png";
+
+static const int DEFAULT_REPEAT = 1;
+static const int DEFAULT_NUM_BUFFERS = 0;
 
 /* Filter signals and args */
 enum
@@ -65,8 +74,10 @@ enum
 enum
 {
   PROP_0,
+  PROP_NUMBUF,
+  PROP_LOCATION,
+  PROP_REPEAT,
   PROP_SILENT,
-  PROP_LOCATION
 };
 
 /* the capabilities of the inputs and outputs.
@@ -108,7 +119,8 @@ GST_STATIC_PAD_TEMPLATE (
  *
  */
 #define DEBUG_INIT(bla) \
-  GST_DEBUG_CATEGORY_INIT (gst_oftvg_debug, "oftvg", 0, "OptoFidelity Test Video Generator");
+  GST_DEBUG_CATEGORY_INIT (gst_oftvg_debug, "oftvg", 0, \
+    "OptoFidelity Test Video Generator");
 
 GST_BOILERPLATE_FULL (GstOFTVG, gst_oftvg, GstBaseTransform,
     GST_TYPE_BASE_TRANSFORM, DEBUG_INIT);
@@ -144,10 +156,10 @@ gst_oftvg_base_init (gpointer klass)
       gst_static_pad_template_get (&sink_template));
 }
 
+static int frame_count = 0;
 static guint32 gst_oftvg_get_frame_number(GstOFTVG* filter)
 {
   // TODO: implement really
-  static int frame_count = 0;
   return frame_count++;
 }
 
@@ -161,13 +173,24 @@ gst_oftvg_class_init (GstOFTVGClass * klass)
   gobject_class->set_property = gst_oftvg_set_property;
   gobject_class->get_property = gst_oftvg_get_property;
 
+  g_object_class_install_property(gobject_class, PROP_LOCATION,
+    g_param_spec_string ("location", "Location", "Layout bitmap file location",
+      DEFAULT_LAYOUT_LOCATION,
+      (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
+
+  g_object_class_install_property(gobject_class, PROP_NUMBUF,
+    g_param_spec_int ("num-buffers", "numbuf", "Number of buffers to process.",
+      0, G_MAXINT, DEFAULT_NUM_BUFFERS,
+      (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
+
+  g_object_class_install_property(gobject_class, PROP_REPEAT,
+    g_param_spec_int ("repeat", "Repeat", "Repeat n times.",
+      1, G_MAXINT, DEFAULT_REPEAT,
+      (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
+
   g_object_class_install_property(gobject_class, PROP_SILENT,
     g_param_spec_boolean ("silent", "Silent", "Produce verbose output ?",
           FALSE, (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
-  g_object_class_install_property(gobject_class, PROP_LOCATION,
-    g_param_spec_string ("location", "Location", "Layout bitmap file location",
-    DEFAULT_LAYOUT_LOCATION,
-    (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
 
   btrans->transform_ip = GST_DEBUG_FUNCPTR(gst_oftvg_transform_ip);
   btrans->set_caps     = GST_DEBUG_FUNCPTR(gst_oftvg_set_caps);
@@ -181,6 +204,10 @@ gst_oftvg_init (GstOFTVG *filter, GstOFTVGClass * klass)
 {
   filter->silent = FALSE;
   filter->layout_location = g_strdup(DEFAULT_LAYOUT_LOCATION);
+  filter->repeat = DEFAULT_REPEAT;
+  filter->num_buffers = DEFAULT_NUM_BUFFERS;
+
+  filter->repeat_count = 0;  
 
   if (!filter->silent)
   {
@@ -194,16 +221,24 @@ gst_oftvg_set_property (GObject * object, guint prop_id,
 {
   GstOFTVG *filter = GST_OFTVG (object);
 
+  
+
   switch (prop_id) {
-    case PROP_SILENT:
-      filter->silent = g_value_get_boolean(value);
-      break;
     case PROP_LOCATION:
       if (filter->layout_location != NULL)
       {
         g_free(filter->layout_location);
       }
       filter->layout_location = g_value_dup_string(value);
+      break;
+    case PROP_NUMBUF:
+      filter->num_buffers = g_value_get_int(value);
+      break;
+    case PROP_REPEAT:
+      filter->repeat = g_value_get_int(value);
+      break;
+    case PROP_SILENT:
+      filter->silent = g_value_get_boolean(value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -218,8 +253,17 @@ gst_oftvg_get_property (GObject * object, guint prop_id,
   GstOFTVG *filter = GST_OFTVG (object);
 
   switch (prop_id) {
+    case PROP_LOCATION:
+      g_value_set_string(value, filter->layout_location);
+      break;
+    case PROP_NUMBUF:
+      g_value_set_int(value, filter->num_buffers);
+      break;
+    case PROP_REPEAT:
+      g_value_set_int(value, filter->repeat);
+      break;
     case PROP_SILENT:
-      g_value_set_boolean (value, filter->silent);
+      g_value_set_boolean(value, filter->silent);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -232,11 +276,12 @@ gst_oftvg_get_property (GObject * object, guint prop_id,
 /* this function does the actual processing. In place processing.
  */
 static GstFlowReturn
-gst_oftvg_transform_ip(GstBaseTransform * base, GstBuffer *buf)
+gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
 {
+  g_print("begin_processing\n");
+  timemeasure_t timer1 = begin_timing();
+
   GstOFTVG *filter = GST_OFTVG (base);
-  int width;
-  int height;
 
   //static int debug_counter = 0;
   if (filter->layout.length() == 0 /*|| debug_counter++%200==0*/)
@@ -256,9 +301,47 @@ gst_oftvg_transform_ip(GstBaseTransform * base, GstBuffer *buf)
     }
   }
 
-  width = filter->width;
-  height = filter->height;
-  filter->process_inplace(GST_BUFFER_DATA(buf), filter);
+  int frame_number = gst_oftvg_get_frame_number(filter);
+  int max_frame_number = filter->num_buffers - 1;
+  g_print("frame %d (%d)\n", frame_number, max_frame_number);
+  if (max_frame_number < 0)
+  {
+    max_frame_number = filter->layout.maxFrameNumber();
+  }
+
+  if (frame_number > max_frame_number)
+    {
+      // Enough frames have been processed.
+      g_print("gstoftvg: Enough frames have been processed %d %d.",
+        frame_count, filter->repeat_count);
+      gst_pad_push_event(filter->element.srcpad, gst_event_new_eos());
+      return GST_FLOW_OK;
+    }
+
+  filter->process_inplace(GST_BUFFER_DATA(buf), filter, frame_number);
+
+  if (frame_number >= max_frame_number
+    && filter->repeat_count + 1 < filter->repeat)
+  {
+    filter->repeat_count++;    
+    // Seek the stream
+    gdouble rate = 1.0;
+    if (!gst_element_seek(&base->element, rate, GST_FORMAT_TIME,
+      (GstSeekFlags) (GST_SEEK_FLAG_FLUSH|GST_SEEK_FLAG_SEGMENT
+                      |GST_SEEK_FLAG_ACCURATE),
+      GST_SEEK_TYPE_SET, 0, GST_SEEK_TYPE_SET, -1))
+    {
+      GST_ELEMENT_ERROR(filter, STREAM, FAILED, (NULL),
+        ("gstoftvg: seek"));
+      return GST_FLOW_ERROR;
+    }
+    frame_count = 0;
+  }
+
+  if (filter->silent == FALSE)
+  {
+    end_timing(timer1, "gst_oftvg_process_default");
+  }
 
   return GST_FLOW_OK;
 }
@@ -278,6 +361,7 @@ static void gst_oftvg_init_params(GstOFTVG* filter)
 {
   const guint8 bit_on_color_yuv[4] = { 255, 128, 128, 0 };
   const guint8 bit_off_color_yuv[4] = { 0, 128, 128, 0 };
+
   const guint8 bit_on_color_rgb[4] = { 255, 255, 255, 0 };
   const guint8 bit_off_color_rgb[4] = { 0, 0, 0, 0 };
 
@@ -304,6 +388,8 @@ static void gst_oftvg_init_params(GstOFTVG* filter)
     bit_on_color, sizeof(guint8)*4);
   memcpy((void *) &(filter->bit_off_color[0]),
     bit_off_color, sizeof(guint8)*4);
+
+  filter->layout.clear();
 }
 
 static gboolean gst_oftvg_set_caps(GstBaseTransform* object,
@@ -368,16 +454,9 @@ static int gst_oftvg_get_subsampling_v_shift(GstVideoFormat format,
 /// determined by filter->color.
 /// Note: gst_oftvg_set_process_function determines
 /// which processing function to use.
-void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter)
+void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter, int frame_number)
 {
-  timemeasure_t timer1 = begin_timing();
-
   GstVideoFormat format = filter->in_format;
-  guint8 bit_on_color[4];
-  guint8 bit_off_color[4];
-
-  memcpy(bit_on_color, filter->bit_on_color, sizeof(guint8) * 4);
-  memcpy(bit_off_color, filter->bit_off_color, sizeof(guint8) * 4);
 
   const int width = filter->width;
   const int height = filter->height;
@@ -399,8 +478,6 @@ void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter)
   int uoff = gst_video_format_get_pixel_stride(format, 1);
   int voff = gst_video_format_get_pixel_stride(format, 2);
 
-  int frame_number = gst_oftvg_get_frame_number(filter);
-
   if (filter->layout.length() != 0)
   {
     int length = filter->layout.length();
@@ -408,48 +485,39 @@ void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter)
     {
       const GstOFTVGElement& element = filter->layout.elements()[i];
 
-      guint8* posY = bufY + element.y() * y_stride + element.x() * yoff;
-      guint8* posU = bufU + (element.y() >> v_subs) * uv_stride
+      // The components are disjoint. There they may be qualified
+      // with the restrict keyword.
+      guint8* Restrict posY = bufY + element.y() * y_stride + element.x() * yoff;
+      guint8* Restrict posU = bufU + (element.y() >> v_subs) * uv_stride
         + (element.x() >> h_subs) * uoff;
-      guint8* posV = bufV + (element.y() >> v_subs) * uv_stride
+      guint8* Restrict posV = bufV + (element.y() >> v_subs) * uv_stride
         + (element.x() >> h_subs) * voff;
 
       gboolean bit_on = element.isBitOn(frame_number);
-      const guint8* color = bit_on ? bit_on_color : bit_off_color;
-
-      guint8 y = color[0];
-      guint8 u = color[1];
-      guint8 v = color[2];
+      const guint8* color =
+        bit_on ? filter->bit_on_color : filter->bit_off_color;
 
       for (int dx = 0; dx < element.width(); dx++)
       {
-        *posY = y;
+        *posY = color[0];
         posY += yoff;
       }
       
       for (int dx = 0; dx < element.width(); dx += 1 << h_subs)
       {
-        *posU = u;
-        *posV = v;
+        *posU = color[1];
+        *posV = color[2];
         posU += uoff;
         posV += voff;
       }
     }
   }
-
-  if (filter->silent == FALSE)
-  {
-    end_timing(timer1, "gst_oftvg_process_default");
-  }
 }
 
 static gboolean gst_oftvg_set_process_function(GstOFTVG* filter)
 {
-  if (gst_video_format_is_yuv(filter->in_format))
-  {
-    filter->process_inplace = gst_oftvg_process_default;
-  }
-  else if (gst_video_format_is_rgb(filter->in_format))
+  if (gst_video_format_is_yuv(filter->in_format)
+    || gst_video_format_is_rgb(filter->in_format))
   {
     filter->process_inplace = gst_oftvg_process_default;
   }

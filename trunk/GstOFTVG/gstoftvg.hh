@@ -52,14 +52,23 @@ struct _GstOFTVG {
   int width;
   int height;
 
+  /* internal state */
+  /// How many times to repeat the frames.
+  int repeat_count;
+  /// Number of frames to process. If -1, the number is determined by
+  /// the layout.
+  int num_buffers;
+
   GstOFTVGLayout layout;
 
   /* properties */
   gboolean silent;
   gchar* layout_location;
+  /// Repeat first x frames n times.
+  int repeat;
   
   /* processing function */
-  void (*process_inplace)(guint8 *buf, GstOFTVG *filter);
+  void (*process_inplace)(guint8 *buf, GstOFTVG *filter, int frame_number);
 
   /* precalculated values */
   guint8 bit_off_color[4];

@@ -92,6 +92,10 @@ public:
   /// Returns the list of elements.
   const GstOFTVGElement* elements() const;
 
+  /// Returns the number the highest frame number that can be
+  /// represented by the frame id marks in the layout.
+  int maxFrameNumber() const;
+
 protected:
   /// Get last element.
   /// Precondition: length() > 0.
@@ -99,6 +103,7 @@ protected:
 
 private:
   std::vector<GstOFTVGElement> elements_;
+  int frameidBits_;
 };
 
 /**

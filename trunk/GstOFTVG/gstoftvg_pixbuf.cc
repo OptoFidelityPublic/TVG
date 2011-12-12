@@ -65,11 +65,14 @@ gboolean GstOFTVGElement::propertiesEqual(const GstOFTVGElement& b) const
 }
 
 GstOFTVGLayout::GstOFTVGLayout()
-   : elements_()
+   : elements_(), frameidBits_(0)
 {
 }
 
-
+/// Adds a pixel to the layout.
+/// @param x X coordinate.
+/// @param y Y coordinate.
+/// @param frameid_n Frame ID number. 1 == the lowest bit of the frame number.
 void GstOFTVGLayout::addPixel(int x, int y, int frameid_n, gboolean isSyncMark)
 {
   int width = 1;
@@ -96,6 +99,7 @@ void GstOFTVGLayout::addPixel(int x, int y, int frameid_n, gboolean isSyncMark)
   }
   // Create new element.
   addElement(element);
+  frameidBits_ |= (1 << frameid_n);
 }
 
 void GstOFTVGLayout::clear()
@@ -103,14 +107,14 @@ void GstOFTVGLayout::clear()
   if (elements_.size() > 0)
   {
     elements_.clear();
+    frameidBits_ = 0;
   }
 }
 
 void GstOFTVGLayout::addElement(const GstOFTVGElement& element)
 {
-  GstOFTVGLayout* layout = this;
   // Copy element
-  layout->elements_.push_back(element);
+  elements_.push_back(element);
 }
 
 int GstOFTVGLayout::length() const
@@ -121,6 +125,11 @@ int GstOFTVGLayout::length() const
 const GstOFTVGElement* GstOFTVGLayout::elements() const
 {
   return &elements_[0];
+}
+
+int GstOFTVGLayout::maxFrameNumber() const
+{
+  return frameidBits_;
 }
 
 GstOFTVGElement& GstOFTVGLayout::last()
