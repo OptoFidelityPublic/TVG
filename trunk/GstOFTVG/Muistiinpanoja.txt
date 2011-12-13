@@ -94,11 +94,15 @@ sys	0m0.030s
 --
 
 queue2:n ajatuksena hyödyntää rinnakkaisuutta pitämällä puskurissa
-dataa kullekin putken vaiheelle.
+dataa kullekin putken vaiheelle. Ei mittaustietoa onko käytännön
+hyötyä suorituskykyyn.
 
-queue2:n parametri
+queue2:n parametrit
   max-size-time
+  max-size-buffers
+  max-size-bytes
 
 Matalampi bitrate x264encille nopeuttaa pakkaamista.
+speed-preset:llä on huomattava vaikutus pakkausnopeuteen.
 
 --
