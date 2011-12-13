@@ -100,7 +100,7 @@ void GstOFTVGLayout::addPixel(int x, int y, int frameid_n, gboolean isSyncMark)
   }
   // Create new element.
   addElement(element);
-  frameidBits_ |= (1 << frameid_n);
+  frameidBits_ |= (1 << (frameid_n - 1));
 }
 
 void GstOFTVGLayout::clear()
