@@ -278,7 +278,6 @@ gst_oftvg_get_property (GObject * object, guint prop_id,
 static GstFlowReturn
 gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
 {
-  g_print("begin_processing\n");
   timemeasure_t timer1 = begin_timing();
 
   GstOFTVG *filter = GST_OFTVG (base);
@@ -303,7 +302,10 @@ gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
 
   int frame_number = gst_oftvg_get_frame_number(filter);
   int max_frame_number = filter->num_buffers - 1;
-  g_print("frame %d (%d)\n", frame_number, max_frame_number);
+  if (!filter->silent)
+  {
+    g_print("frame %d (%d)\n", frame_number, max_frame_number);
+  }
   if (max_frame_number < 0)
   {
     max_frame_number = filter->layout.maxFrameNumber();
@@ -487,7 +489,8 @@ void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter, int frame_number)
 
       // The components are disjoint. There they may be qualified
       // with the restrict keyword.
-      guint8* Restrict posY = bufY + element.y() * y_stride + element.x() * yoff;
+      guint8* Restrict posY = bufY + element.y() * y_stride
+        + element.x() * yoff;
       guint8* Restrict posU = bufU + (element.y() >> v_subs) * uv_stride
         + (element.x() >> h_subs) * uoff;
       guint8* Restrict posV = bufV + (element.y() >> v_subs) * uv_stride
