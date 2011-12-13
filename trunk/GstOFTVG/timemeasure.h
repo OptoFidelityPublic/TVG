@@ -63,11 +63,15 @@ static inline double end_timing(timemeasure_t timer, const char *name)
     result = end.tv_sec + end.tv_usec / 1000000.0;
 #endif
     
-    fprintf(stderr, "Timer %15s: %0.6f\n", name, result);
+    //fprintf(stderr, "Timer %15s: %0.6f\n", name, result);
 #endif
 
     return result;
 }
 
+static void show_timing(double result, const char* name)
+{
+  g_print("Timer %15s: %0.6f\n", name, result);
+}
 
 #endif

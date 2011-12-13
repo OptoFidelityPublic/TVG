@@ -48,7 +48,8 @@ GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
 GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
     gboolean isSyncMark, int frameid_n)
 : x_(x), y_(y), width_(width), height_(height),
-    isSyncMark_(isSyncMark), offset_(0), period_(1 << frameid_n), duty_(1 << frameid_n - 1)
+    isSyncMark_(isSyncMark),
+    offset_(0), period_(1 << frameid_n), duty_(1 << (frameid_n - 1))
 {
   // For simplicity only elements of height 1 are currently
   // implemented for rendering.

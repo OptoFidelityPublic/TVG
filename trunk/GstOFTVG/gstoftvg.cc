@@ -133,7 +133,8 @@ static void gst_oftvg_get_property (GObject * object, guint prop_id,
 static GstFlowReturn gst_oftvg_transform_ip (GstBaseTransform * base,
     GstBuffer * outbuf);
 
-static gboolean gst_oftvg_set_caps(GstBaseTransform* btrans, GstCaps* incaps, GstCaps* outcaps);
+static gboolean gst_oftvg_set_caps(GstBaseTransform* btrans,
+  GstCaps* incaps, GstCaps* outcaps);
 
 static gboolean gst_oftvg_set_process_function(GstOFTVG* filter);
 
@@ -156,11 +157,40 @@ gst_oftvg_base_init (gpointer klass)
       gst_static_pad_template_get (&sink_template));
 }
 
-static int frame_count = 0;
-static guint32 gst_oftvg_get_frame_number(GstOFTVG* filter)
+static void gst_oftvg_frame_counter_init(GstOFTVG* const filter,
+  gint64 frame_counter)
 {
-  // TODO: implement really
-  return frame_count++;
+  filter->frame_counter = frame_counter;
+}
+
+static void gst_oftvg_frame_counter_advance(GstOFTVG* const filter)
+{
+  filter->frame_counter++;
+}
+
+/// Gets the frame number
+static gint64 gst_oftvg_get_frame_number(GstOFTVG* const filter,
+  const GstBuffer* const buf)
+{
+  // For video frames, buf->offset is the frame number of this buffer.
+  // By qtdemux and oggdemux offset seems to be constantly -1.
+  // Lets use our internal frame counter then.
+  if ((gint64) buf->offset >= 0)
+  {
+    //g_print("offset >= 0 %d\n", (int) buf->offset);
+    gst_oftvg_frame_counter_init(filter, buf->offset);
+  }
+  return filter->frame_counter;
+}
+
+static gint64 gst_oftvg_get_max_frame_number(GstOFTVG* const filter)
+{
+  gint64 max_frame_number = filter->num_buffers - 1;
+  if (max_frame_number < 0)
+  {
+    max_frame_number = filter->layout.maxFrameNumber();
+  }
+  return max_frame_number;
 }
 
 /* initialize the oftvg's class */
@@ -200,14 +230,17 @@ gst_oftvg_class_init (GstOFTVGClass * klass)
  * initialize instance structure
  */
 static void
-gst_oftvg_init (GstOFTVG *filter, GstOFTVGClass * klass)
+gst_oftvg_init (GstOFTVG* filter, GstOFTVGClass* klass)
 {
+  /* unused parameter */ klass;
+
   filter->silent = FALSE;
   filter->layout_location = g_strdup(DEFAULT_LAYOUT_LOCATION);
   filter->repeat = DEFAULT_REPEAT;
   filter->num_buffers = DEFAULT_NUM_BUFFERS;
+  filter->frame_counter = 0;
 
-  filter->repeat_count = 0;  
+  filter->repeat_count = 1;
 
   if (!filter->silent)
   {
@@ -217,11 +250,9 @@ gst_oftvg_init (GstOFTVG *filter, GstOFTVGClass * klass)
 
 static void
 gst_oftvg_set_property (GObject * object, guint prop_id,
-    const GValue * value, GParamSpec * pspec)
+    const GValue* value, GParamSpec * pspec)
 {
   GstOFTVG *filter = GST_OFTVG (object);
-
-  
 
   switch (prop_id) {
     case PROP_LOCATION:
@@ -300,49 +331,75 @@ gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
     }
   }
 
-  int frame_number = gst_oftvg_get_frame_number(filter);
-  int max_frame_number = filter->num_buffers - 1;
+  gint64 frame_number = gst_oftvg_get_frame_number(filter, buf);
+  gint64 max_frame_number = gst_oftvg_get_max_frame_number(filter);
+
   if (!filter->silent)
   {
-    g_print("frame %d (%d)\n", frame_number, max_frame_number);
-  }
-  if (max_frame_number < 0)
-  {
-    max_frame_number = filter->layout.maxFrameNumber();
+    //g_print("frame %d (%d)\n", (int) frame_number, (int) max_frame_number);
   }
 
-  if (frame_number > max_frame_number)
+  if ((frame_number > max_frame_number
+    && filter->repeat_count >= filter->repeat)
+    || filter->repeat_count > filter->repeat)
+  {
+    // Enough frames have been processed.
+    if (!filter->silent)
     {
-      // Enough frames have been processed.
-      g_print("gstoftvg: Enough frames have been processed %d %d.",
-        frame_count, filter->repeat_count);
-      gst_pad_push_event(filter->element.srcpad, gst_event_new_eos());
-      return GST_FLOW_OK;
+      g_print("gstoftvg: Enough frames have been processed %d. %d",
+        (int) frame_number, filter->repeat_count);
     }
 
-  filter->process_inplace(GST_BUFFER_DATA(buf), filter, frame_number);
+    gst_pad_push_event(filter->element.srcpad, gst_event_new_eos());
+    return GST_FLOW_UNEXPECTED;
+  }
 
-  if (frame_number >= max_frame_number
-    && filter->repeat_count + 1 < filter->repeat)
+  filter->process_inplace(GST_BUFFER_DATA(buf), filter, (int) frame_number);
+  gst_oftvg_frame_counter_advance(filter);
+
+  if (frame_number >= max_frame_number)
   {
-    filter->repeat_count++;    
+    if (!filter->silent)
+    {
+      g_print("gstoftvg: repeat\n");
+    }
+    filter->repeat_count++;
     // Seek the stream
     gdouble rate = 1.0;
     if (!gst_element_seek(&base->element, rate, GST_FORMAT_TIME,
-      (GstSeekFlags) (GST_SEEK_FLAG_FLUSH|GST_SEEK_FLAG_SEGMENT
+      (GstSeekFlags) (GST_SEEK_FLAG_FLUSH/*|GST_SEEK_FLAG_SEGMENT*/
                       |GST_SEEK_FLAG_ACCURATE),
-      GST_SEEK_TYPE_SET, 0, GST_SEEK_TYPE_SET, -1))
+                      GST_SEEK_TYPE_SET, 0, GST_SEEK_TYPE_NONE, 0))
     {
       GST_ELEMENT_ERROR(filter, STREAM, FAILED, (NULL),
         ("gstoftvg: seek"));
       return GST_FLOW_ERROR;
     }
-    frame_count = 0;
+    gst_oftvg_frame_counter_init(filter, 0);
   }
 
-  if (filter->silent == FALSE)
+  if (!filter->silent)
   {
-    end_timing(timer1, "gst_oftvg_process_default");
+    static double total_oftvg_time = 0;
+    static int timer_counter = 0;
+    static timemeasure_t total_pipeline_timer = 0;
+    total_oftvg_time += end_timing(timer1, "gst_oftvg_process_default");
+    if (timer_counter == 0)
+    {
+      total_pipeline_timer = timer1;
+    }
+    timer_counter++;
+    if (timer_counter % 10 == 0)
+    {
+      show_timing(total_oftvg_time / 10, "gst_oftvg_transform_ip");
+      total_oftvg_time = 0;
+    }
+    if (timer_counter % 100 == 0)
+    {
+      double total_pipeline_time = end_timing(total_pipeline_timer,
+        "total_pipeline_timer");
+      show_timing(total_pipeline_time / timer_counter, "total_pipeline_time");
+    }
   }
 
   return GST_FLOW_OK;
@@ -397,27 +454,28 @@ static void gst_oftvg_init_params(GstOFTVG* filter)
 static gboolean gst_oftvg_set_caps(GstBaseTransform* object,
   GstCaps* incaps, GstCaps* outcaps)
 {
-    GstOFTVG *filter = GST_OFTVG(object);
+  /* unused parameter */ outcaps;
+  GstOFTVG *filter = GST_OFTVG(object);
 
-    if (!gst_video_format_parse_caps(incaps, &filter->in_format,
-           &filter->width, &filter->height)
-     || !gst_video_format_parse_caps(incaps, &filter->out_format,
-           &filter->width, &filter->height))
-    {
-      GST_WARNING_OBJECT(filter, "Failed to parse caps %"
-        GST_PTR_FORMAT " -> %" GST_PTR_FORMAT, incaps, outcaps);
-      return FALSE;
-    }
+  if (!gst_video_format_parse_caps(incaps, &filter->in_format,
+          &filter->width, &filter->height)
+    || !gst_video_format_parse_caps(incaps, &filter->out_format,
+          &filter->width, &filter->height))
+  {
+    GST_WARNING_OBJECT(filter, "Failed to parse caps %"
+      GST_PTR_FORMAT " -> %" GST_PTR_FORMAT, incaps, outcaps);
+    return FALSE;
+  }
 
-    if (!gst_oftvg_set_process_function(filter))
-    {
-      GST_WARNING_OBJECT(filter, "No processing function for this caps");
-      return FALSE;
-    }
+  if (!gst_oftvg_set_process_function(filter))
+  {
+    GST_WARNING_OBJECT(filter, "No processing function for this caps");
+    return FALSE;
+  }
 
-    gst_oftvg_init_params(filter);
+  gst_oftvg_init_params(filter);
 
-    return TRUE;
+  return TRUE;
 }
 
 static int gst_oftvg_integer_log2(int val)

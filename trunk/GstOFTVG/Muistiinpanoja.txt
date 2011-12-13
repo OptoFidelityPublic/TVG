@@ -34,3 +34,30 @@ http://mail.gnome.org/archives/gtkmm-list/2011-August/msg00040.html
 
 gst-launch.exe --gst-plugin-path=../Debug filesrc location=../../GstOFTVG/Media/big_buck_bunny_1080p_h264.mov ! decodebin ! oftvg ! autovideosink
 
+--
+
+13.12.2011
+
+decodebin is deprecated. decodebin2 should be used instead.
+
+filesrc element with *.mov and *.ogg files won't produce 
+meaningful buf->offset values but just -1.
+
+--
+
+13.12.2011
+
+
+jarvi@ATOSTEK56 ~/projects/TGV/tvg-repo/trunk/GstOFTVG
+$ time (cd Release; gst-launch.exe -v --gst-plugin-path='.' filesrc 
+location=../Media/big_buck_bunny_1080p_h264.mov ! decodebin2 ! queue2 ! 
+oftvg location=../layout/test-layout-1920x1080-c.bmp silent=false 
+num-buffers=256 repeat=8 ! queue2 ! x264enc ! queue2 ! avimux ! filesink 
+location=test3.avi)
+
+real	1m52.597s
+user	0m0.031s
+sys	0m0.000s
+
+
+--

@@ -53,6 +53,7 @@ struct _GstOFTVG {
   int height;
 
   /* internal state */
+  
   /// How many times to repeat the frames.
   int repeat_count;
   /// Number of frames to process. If -1, the number is determined by
@@ -60,6 +61,9 @@ struct _GstOFTVG {
   int num_buffers;
 
   GstOFTVGLayout layout;
+
+  /// Plugin's internal frame counter.
+  gint64 frame_counter;
 
   /* properties */
   gboolean silent;
