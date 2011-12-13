@@ -48,7 +48,6 @@ meaningful buf->offset values but just -1.
 13.12.2011
 
 
-jarvi@ATOSTEK56 ~/projects/TGV/tvg-repo/trunk/GstOFTVG
 $ time (cd Release; gst-launch.exe -v --gst-plugin-path='.' filesrc 
 location=../Media/big_buck_bunny_1080p_h264.mov ! decodebin2 ! queue2 ! 
 oftvg location=../layout/test-layout-1920x1080-c.bmp silent=false 
@@ -58,6 +57,24 @@ location=test3.avi)
 real	1m52.597s
 user	0m0.031s
 sys	0m0.000s
+
+
+--
+
+
+$ time (cd Release; gst-launch.exe -v --gst-plugin-path='.' filesrc 
+location=../Media/big_buck_bunny_1080p_h264.mov ! decodebin2 ! videoscale 
+! video/x-raw-yuv,width=1920 ! queue2 ! oftvg 
+location=../layout/test-layout-1920x1080-c.bmp silent=false 
+num-buffers=512 repeat=2 ! queue2 ! x264enc speed-preset=4 ! queue2 ! 
+avimux ! filesink location=test4.avi)
+
+real	0m32.042s
+user	0m0.015s
+sys	0m0.015s
+
+--
+
 
 
 --

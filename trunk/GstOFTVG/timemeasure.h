@@ -71,7 +71,8 @@ static inline double end_timing(timemeasure_t timer, const char *name)
 
 static void show_timing(double result, const char* name)
 {
-  g_print("Timer %15s: %0.6f\n", name, result);
+  g_print("Timer %15s: %0.6f (%0.2f / s)\n",
+    name, result, result>0.000001?1.0/result:0.0);
 }
 
 #endif

@@ -389,16 +389,17 @@ gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
       total_pipeline_timer = timer1;
     }
     timer_counter++;
-    if (timer_counter % 10 == 0)
+    if (timer_counter % 100 == 0)
     {
-      show_timing(total_oftvg_time / 10, "gst_oftvg_transform_ip");
+      show_timing(total_oftvg_time / 100, "gst_oftvg_transform_ip");
       total_oftvg_time = 0;
     }
     if (timer_counter % 100 == 0)
     {
       double total_pipeline_time = end_timing(total_pipeline_timer,
         "total_pipeline_timer");
-      show_timing(total_pipeline_time / timer_counter, "total_pipeline_time");
+      show_timing(total_pipeline_time / timer_counter,
+        "total_pipeline_timer");
     }
   }
 
