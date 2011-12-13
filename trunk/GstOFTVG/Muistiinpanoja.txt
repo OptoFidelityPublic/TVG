@@ -75,6 +75,30 @@ sys	0m0.015s
 
 --
 
+$ time (cd Release; gst-launch.exe -v --gst-plugin-path='.' filesrc 
+location=../Media/big_buck_bunny_1080p_h264.mov ! decodebin2 ! queue2 
+max-size-bytes=20000000 ! oftvg 
+location=../layout/test-layout-1920x1080-c.bmp silent=false 
+num-buffers=4096 repeat=32 ! queue2 max-size-bytes=20000000 ! x264enc 
+speed-preset=4 bitrate=15000 ! queue2 max-size-bytes=20000000 ! avimux ! 
+filesink location=test4.avi)
 
+...
+
+Timer total_pipeline_timer: 0.037701 (26.52 / s)
+
+real	82m26.888s
+user	0m0.000s
+sys	0m0.030s
+
+--
+
+queue2:n ajatuksena hyödyntää rinnakkaisuutta pitämällä puskurissa
+dataa kullekin putken vaiheelle.
+
+queue2:n parametri
+  max-size-time
+
+Matalampi bitrate x264encille nopeuttaa pakkaamista.
 
 --
