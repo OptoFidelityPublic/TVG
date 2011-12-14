@@ -17,15 +17,19 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  */
- 
-#ifndef __GST_OFTVG_H__
-#define __GST_OFTVG_H__
+
+/**
+ * Private declarations for GstOFTVG element.
+ */
+
+#ifndef __GST_OFTVG_HH__
+#define __GST_OFTVG_HH__
 
 #include <gst/gst.h>
 #include <gst/video/video.h>
 #include <gst/base/gstbasetransform.h>
 
-#include "gstoftvg_pixbuf.hh"
+#include "gstoftvg_layout.hh"
 
 G_BEGIN_DECLS
 
@@ -88,4 +92,4 @@ GType gst_oftvg_get_type (void);
 
 G_END_DECLS
 
-#endif /* __GST_OFTVG_H__ */
+#endif /* __GST_OFTVG_HH__ */

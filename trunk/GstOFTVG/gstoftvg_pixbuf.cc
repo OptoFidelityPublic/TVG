@@ -18,126 +18,22 @@
  * Boston, MA 02111-1307, USA.
  */
 
+/**
+ * GstOFTVGLayout initialization from a bitmap file.
+ */
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
 #include <glib.h>
-#include <gst/gst.h>
-#include <gst/base/gstbasetransform.h>
-#include <gst/video/video.h>
 
 #include <gdk-pixbuf/gdk-pixbuf.h>
 
-#include "gstoftvg.hh"
+#include "gstoftvg_layout.hh"
 #include "gstoftvg_pixbuf.hh"
-#include "timemeasure.h"
 
 const static int gst_oftvg_BITS_PER_SAMPLE = 8;
-
-GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
-    gboolean isSyncMark, int offset, int period, int duty)
-: x_(x), y_(y), width_(width), height_(height),
-    isSyncMark_(isSyncMark), offset_(offset), period_(period), duty_(duty)
-{
-  // For simplicity only elements of height 1 are currently
-  // implemented for rendering.
-  g_assert(height == 1);
-}
-
-GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
-    gboolean isSyncMark, int frameid_n)
-: x_(x), y_(y), width_(width), height_(height),
-    isSyncMark_(isSyncMark),
-    offset_(0), period_(1 << frameid_n), duty_(1 << (frameid_n - 1))
-{
-  // For simplicity only elements of height 1 are currently
-  // implemented for rendering.
-  g_assert(height == 1);
-}
-
-/// Returns whether the properties apart from location and
-/// size equal to element b.
-gboolean GstOFTVGElement::propertiesEqual(const GstOFTVGElement& b) const
-{
-  const GstOFTVGElement& a = *this;
-  return a.offset_ == b.offset_ && a.period_ == b.period_ && a.duty_ == b.duty_
-    && a.isSyncMark_ == b.isSyncMark_;
-}
-
-GstOFTVGLayout::GstOFTVGLayout()
-   : elements_(), frameidBits_(0)
-{
-}
-
-/// Adds a pixel to the layout.
-/// @param x X coordinate.
-/// @param y Y coordinate.
-/// @param frameid_n Frame ID number. 1 == the lowest bit of the frame number.
-void GstOFTVGLayout::addPixel(int x, int y, int frameid_n, gboolean isSyncMark)
-{
-  int width = 1;
-  int height = 1;
-  GstOFTVGElement element(x, y, width, height, isSyncMark, frameid_n);
-
-  if (length() > 0)
-  {
-    GstOFTVGElement& prev = last();
-
-    if (prev.y() == y && x >= prev.x() && x < prev.x() + prev.width())
-    {
-      // There is a pixel here already.
-      return;
-    }
-    else if (prev.y() == y && prev.x() == x - prev.width()
-      && prev.propertiesEqual(element))
-    {
-      // Combine with previous element. Assume we are adding pixels from
-      // left to right.
-      last().width_ += element.width();
-      return;
-    }
-  }
-  // Create new element.
-  addElement(element);
-  frameidBits_ |= (1 << (frameid_n - 1));
-}
-
-void GstOFTVGLayout::clear()
-{
-  if (elements_.size() > 0)
-  {
-    elements_.clear();
-    frameidBits_ = 0;
-  }
-}
-
-void GstOFTVGLayout::addElement(const GstOFTVGElement& element)
-{
-  // Copy element
-  elements_.push_back(element);
-}
-
-int GstOFTVGLayout::length() const
-{
-  return elements_.size();
-}
-
-const GstOFTVGElement* GstOFTVGLayout::elements() const
-{
-  return &elements_[0];
-}
-
-int GstOFTVGLayout::maxFrameNumber() const
-{
-  return frameidBits_;
-}
-
-GstOFTVGElement& GstOFTVGLayout::last()
-{
-  g_assert(length() > 0);
-  return elements_[length() - 1];
-}
 
 static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
   int x, int y, int width, int height,
@@ -175,6 +71,7 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
   }
 }
 
+/// Initialize a layout from a bitmap.
 static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
   GstOFTVGLayout* layout)
 {
@@ -207,30 +104,52 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
   }
 }
 
-void gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,
+/**
+ * Loads a layout from a bitmap file. The layout is scaled to the requested
+ * width and height.
+ * If there is an error, error will point to the error message and false is
+ * returned.
+ * @param filename name and path of the file
+ * @param error Pointer will be set to the error message if there is an error.
+ * @param layout Pointer to layout.
+ * @param width The target width of the layout.
+ * @param height The target height of the layout.
+ */
+gboolean gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,
   GstOFTVGLayout* layout, int width, int height)
 {
   GdkPixbuf* origbuf = gdk_pixbuf_new_from_file(filename, error);
   if (origbuf == NULL)
   {
-    return;
+    // Error is set by gdk_pixbuf_new_from_file directly.
+    goto error;
   }
   if (gdk_pixbuf_get_bits_per_sample(origbuf) != gst_oftvg_BITS_PER_SAMPLE)
   {
     g_set_error(error, GST_RESOURCE_ERROR, GST_RESOURCE_ERROR_FAILED,
       ("Layout bitmap is not of expected type."));
-    return;
+    goto error;
   }
   if (gdk_pixbuf_get_colorspace(origbuf) != GDK_COLORSPACE_RGB)
   {
     g_set_error(error, GST_RESOURCE_ERROR, GST_RESOURCE_ERROR_FAILED,
       ("Layout bitmap is not of expected type."));
-    return;
+    goto error;
   }
   
-  GdkPixbuf* buf = gdk_pixbuf_scale_simple(origbuf, width, height, GDK_INTERP_NEAREST);
+  GdkPixbuf* buf =
+    gdk_pixbuf_scale_simple(origbuf, width, height, GDK_INTERP_NEAREST);
   gdk_pixbuf_unref(origbuf);
 
   gst_oftvg_init_layout_from_bitmap(buf, layout);
   gdk_pixbuf_unref(buf);
+
+  return TRUE;
+
+error:
+  if (origbuf != NULL)
+  {
+    gdk_pixbuf_unref(origbuf);
+  }
+  return FALSE;
 }

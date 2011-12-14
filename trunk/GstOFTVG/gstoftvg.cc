@@ -22,12 +22,12 @@
  * SECTION:element-oftvg
  *
  * OFTVG (OptoFidelity Test Video Generator) is a filter that adds overlay
- * frame id markings to each frame.
+ * frame id and synchronization markings to each frame.
  *
  * <refsect2>
  * <title>Example launch line</title>
  * |[
- * gst-launch -v -m fakesrc ! oftvg ! fakesink silent=TRUE
+ * gst-launch -v -m fakesrc ! oftvg ! autovideosink
  * ]|
  * </refsect2>
  */
@@ -36,8 +36,6 @@
 #include "config.h"
 #endif
 
-#define DO_TIMING 1
-
 #include <math.h>
 
 #include <gst/gst.h>
@@ -45,6 +43,9 @@
 #include <gst/video/video.h>
 
 #include "gstoftvg.hh"
+#include "gstoftvg_pixbuf.hh"
+
+#define DO_TIMING 1
 #include "timemeasure.h"
 
 #if defined(_MSC_VER)
@@ -511,6 +512,11 @@ static int gst_oftvg_get_subsampling_v_shift(GstVideoFormat format,
   return gst_oftvg_integer_log2(val);
 }
 
+static GstOFTVGLayout& gst_oftvg_get_layout(GstOFTVG* filter)
+{
+  return filter->layout;
+}
+
 /// Generic processing function. The color components to use are
 /// determined by filter->color.
 /// Note: gst_oftvg_set_process_function determines
@@ -539,12 +545,14 @@ void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter, int frame_number)
   int uoff = gst_video_format_get_pixel_stride(format, 1);
   int voff = gst_video_format_get_pixel_stride(format, 2);
 
-  if (filter->layout.length() != 0)
+  const GstOFTVGLayout& layout = gst_oftvg_get_layout(filter);
+
+  if (layout.length() != 0)
   {
-    int length = filter->layout.length();
+    int length = layout.length();
     for (int i = 0; i < length; ++i)
     {
-      const GstOFTVGElement& element = filter->layout.elements()[i];
+      const GstOFTVGElement& element = layout.elements()[i];
 
       // The components are disjoint. There they may be qualified
       // with the restrict keyword.
@@ -555,22 +563,26 @@ void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter, int frame_number)
       guint8* Restrict posV = bufV + (element.y() >> v_subs) * uv_stride
         + (element.x() >> h_subs) * voff;
 
-      gboolean bit_on = element.isBitOn(frame_number);
-      const guint8* color =
-        bit_on ? filter->bit_on_color : filter->bit_off_color;
+      if (!element.isTransparent(frame_number))
+      {
+        gboolean bit_on = element.isBitOn(frame_number);
+        
+        const guint8* color =
+          bit_on ? filter->bit_on_color : filter->bit_off_color;
 
-      for (int dx = 0; dx < element.width(); dx++)
-      {
-        *posY = color[0];
-        posY += yoff;
-      }
+        for (int dx = 0; dx < element.width(); dx++)
+        {
+          *posY = color[0];
+          posY += yoff;
+        }
       
-      for (int dx = 0; dx < element.width(); dx += 1 << h_subs)
-      {
-        *posU = color[1];
-        *posV = color[2];
-        posU += uoff;
-        posV += voff;
+        for (int dx = 0; dx < element.width(); dx += 1 << h_subs)
+        {
+          *posU = color[1];
+          *posV = color[2];
+          posU += uoff;
+          posV += voff;
+        }
       }
     }
   }
