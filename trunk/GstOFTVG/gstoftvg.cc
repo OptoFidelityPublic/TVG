@@ -377,7 +377,7 @@ static GstFlowReturn gst_oftvg_handle_frame_numbers(
 	  // also prints some debug stuff.
 	  g_print("Progress: %0.1f%% (%0.1f seconds) complete\n",
 		  (float)(max_frame_number * filter->repeat_count + frame_number) / (max_frame_number * (filter->repeat + 1)) * 100,
-		  (float)(GST_BUFFER_TIMESTAMP(buf) + filter->timestamp_offset) / GST_SECOND); 
+		  (float)GST_BUFFER_TIMESTAMP(buf) / GST_SECOND); 
   }
 
   if (frame_number >= max_frame_number
