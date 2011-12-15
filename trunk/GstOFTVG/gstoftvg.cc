@@ -303,88 +303,20 @@ gst_oftvg_get_property (GObject * object, guint prop_id,
   }
 }
 
-/* GstBaseTransform vmethod implementations */
-
-/* this function does the actual processing. In place processing.
- */
-static GstFlowReturn
-gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
+/* timing helpers */
+static void gst_oftvg_process_ip_begin_timing(GstOFTVG* filter)
 {
-  timemeasure_t timer1 = begin_timing();
+}
 
-  GstOFTVG *filter = GST_OFTVG (base);
-
-  //static int debug_counter = 0;
-  if (filter->layout.length() == 0 /*|| debug_counter++%200==0*/)
-  {
-    filter->layout.clear();
-
-    const gchar* filename = filter->layout_location;
-    GError* error = NULL;
-    gst_oftvg_load_layout_bitmap(filename, &error, &filter->layout,
-      filter->width, filter->height);
-
-    if (error != NULL)
-    {
-      GST_ELEMENT_ERROR(filter, RESOURCE, OPEN_READ, (NULL),
-        ("Could not open layout file: %s. %s", filename, error->message));
-      return GST_FLOW_ERROR;
-    }
-  }
-
-  gint64 frame_number = gst_oftvg_get_frame_number(filter, buf);
-  gint64 max_frame_number = gst_oftvg_get_max_frame_number(filter);
-
-  if (!filter->silent)
-  {
-    //g_print("frame %d (%d)\n", (int) frame_number, (int) max_frame_number);
-  }
-
-  if ((frame_number > max_frame_number
-    && filter->repeat_count >= filter->repeat)
-    || filter->repeat_count > filter->repeat)
-  {
-    // Enough frames have been processed.
-    if (!filter->silent)
-    {
-      g_print("gstoftvg: Enough frames have been processed %d. %d",
-        (int) frame_number, filter->repeat_count);
-    }
-
-    gst_pad_push_event(filter->element.srcpad, gst_event_new_eos());
-    return GST_FLOW_UNEXPECTED;
-  }
-
-  filter->process_inplace(GST_BUFFER_DATA(buf), filter, (int) frame_number);
-  gst_oftvg_frame_counter_advance(filter);
-
-  if (frame_number >= max_frame_number)
-  {
-    if (!filter->silent)
-    {
-      g_print("gstoftvg: repeat\n");
-    }
-    filter->repeat_count++;
-    // Seek the stream
-    gdouble rate = 1.0;
-    if (!gst_element_seek(&base->element, rate, GST_FORMAT_TIME,
-      (GstSeekFlags) (GST_SEEK_FLAG_FLUSH/*|GST_SEEK_FLAG_SEGMENT*/
-                      |GST_SEEK_FLAG_ACCURATE),
-                      GST_SEEK_TYPE_SET, 0, GST_SEEK_TYPE_NONE, 0))
-    {
-      GST_ELEMENT_ERROR(filter, STREAM, FAILED, (NULL),
-        ("gstoftvg: seek"));
-      return GST_FLOW_ERROR;
-    }
-    gst_oftvg_frame_counter_init(filter, 0);
-  }
-
+static void gst_oftvg_process_ip_end_timing(GstOFTVG* filter,
+  timemeasure_t timer1)
+{
   if (!filter->silent)
   {
     static double total_oftvg_time = 0;
     static int timer_counter = 0;
     static timemeasure_t total_pipeline_timer = 0;
-    total_oftvg_time += end_timing(timer1, "gst_oftvg_process_default");
+    total_oftvg_time += end_timing(timer1, "gst_oftvg_transform_ip");
     if (timer_counter == 0)
     {
       total_pipeline_timer = timer1;
@@ -398,27 +330,117 @@ gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
     if (timer_counter % 100 == 0)
     {
       double total_pipeline_time = end_timing(total_pipeline_timer,
-        "total_pipeline_timer");
+        "total_pipeline");
       show_timing(total_pipeline_time / timer_counter,
-        "total_pipeline_timer");
+        "total_pipeline");
     }
   }
+}
 
+static GstFlowReturn gst_oftvg_handle_frame_numbers(
+  GstOFTVG* filter, GstBuffer* buf)
+{
+  gint64 frame_number = gst_oftvg_get_frame_number(filter, buf);
+  gint64 max_frame_number = gst_oftvg_get_max_frame_number(filter);
+  if (!filter->silent)
+  {
+    //g_print("frame %d (%d / %d)\n", (int) frame_number, (int) max_frame_number,
+    //  filter->repeat_count);
+  }
+
+  if (frame_number > max_frame_number
+    && filter->repeat_count < filter->repeat)
+  {
+    if (!filter->silent)
+    {
+      g_print("gstoftvg: repeat\n");
+    }
+    filter->repeat_count++;
+    // Seek the stream
+    gint64 seek_pos = 0;
+    if (!gst_element_seek(&filter->element.element, 1.0, GST_FORMAT_TIME,
+      (GstSeekFlags) (GST_SEEK_FLAG_FLUSH|GST_SEEK_FLAG_ACCURATE),
+      GST_SEEK_TYPE_SET, seek_pos, GST_SEEK_TYPE_NONE, 0))
+    {
+      GST_ELEMENT_ERROR(filter, STREAM, FAILED, (NULL),
+        ("gstoftvg: seek"));
+      return GST_FLOW_ERROR;
+    }
+    gst_oftvg_frame_counter_init(filter, 0);
+    return GST_FLOW_UNEXPECTED;
+  }
+
+  if ((frame_number > max_frame_number)
+    || filter->repeat_count > filter->repeat)
+  {
+    // Enough frames have been processed.
+    if (!filter->silent)
+    {
+      g_print("gstoftvg: Enough frames have been processed: %d x %d.\n",
+        filter->repeat_count, (int) frame_number);
+    }
+    /*
+    "It is important to note that only elements driving the pipeline should ever
+    send an EOS event. If your element is chain-based, it is not driving the
+    pipeline. Chain-based elements should just return GST_FLOW_UNEXPECTED from
+    their chain function at the end of the stream (or the configured segment),
+    the upstream element that is driving the pipeline will then take care of
+    sending the EOS event (or alternatively post a SEGMENT_DONE message on the
+    bus depending on the mode of operation)."
+    http://gstreamer.freedesktop.org/data/doc/gstreamer/head/pwg/html/section-events-definitions.html
+    */
+    gst_pad_push_event(filter->element.srcpad, gst_event_new_flush_start());
+    gst_pad_push_event(filter->element.srcpad, gst_event_new_flush_stop());
+    gst_pad_push_event(filter->element.srcpad, gst_event_new_eos());
+    return GST_FLOW_UNEXPECTED;
+  }
   return GST_FLOW_OK;
 }
 
+/* GstBaseTransform vmethod implementations */
+
+static void gst_oftvg_before_transform(GstBaseTransform* btrans,
+  GstBuffer* buffer)
+{
+}
+
+/// This function does the actual processing. In place processing.
+static GstFlowReturn
+gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
+{
+  timemeasure_t timer1 = begin_timing();
+
+  GstOFTVG *filter = GST_OFTVG(base);
+
+  if (filter->layout.length() == 0)
+  {
+    // Reported elsewhere
+    return GST_FLOW_ERROR;
+  }
+
+  GstFlowReturn ret = gst_oftvg_handle_frame_numbers(filter, buf);
+  if (GST_FLOW_IS_SUCCESS(ret))
+  {
+    gint64 frame_number = gst_oftvg_get_frame_number(filter, buf);
+    filter->process_inplace(GST_BUFFER_DATA(buf), filter, (int) frame_number);
+    gst_oftvg_frame_counter_advance(filter);
+    gst_oftvg_process_ip_end_timing(filter, timer1);
+  }
+
+  return ret;
+}
 
 /* entry point to initialize the plug-in
  * initialize the plug-in itself
  * register the element factories and other features
  */
 static gboolean
-oftvg_init (GstPlugin * oftvg)
+oftvg_init (GstPlugin* oftvg)
 {
   return gst_element_register (oftvg, "oftvg", GST_RANK_NONE, GST_TYPE_OFTVG);
 }
 
-static void gst_oftvg_init_params(GstOFTVG* filter)
+static void gst_oftvg_init_colorspace(GstOFTVG* filter)
 {
   const guint8 bit_on_color_yuv[4] = { 255, 128, 128, 0 };
   const guint8 bit_off_color_yuv[4] = { 0, 128, 128, 0 };
@@ -449,9 +471,30 @@ static void gst_oftvg_init_params(GstOFTVG* filter)
     bit_on_color, sizeof(guint8)*4);
   memcpy((void *) &(filter->bit_off_color[0]),
     bit_off_color, sizeof(guint8)*4);
-
-  filter->layout.clear();
 }
+
+static void gst_oftvg_init_layout(GstOFTVG* filter)
+{
+  filter->layout.clear();
+  const gchar* filename = filter->layout_location;
+  GError* error = NULL;
+  gst_oftvg_load_layout_bitmap(filename, &error, &filter->layout,
+    filter->width, filter->height);
+
+  if (error != NULL)
+  {
+    GST_ELEMENT_ERROR(filter, RESOURCE, OPEN_READ,
+      ("Could not open layout file: %s. %s", filename, error->message),
+      (NULL));
+  }
+}
+
+static void gst_oftvg_init_params(GstOFTVG* filter)
+{
+  gst_oftvg_init_colorspace(filter);
+  gst_oftvg_init_layout(filter);
+}
+
 
 static gboolean gst_oftvg_set_caps(GstBaseTransform* object,
   GstCaps* incaps, GstCaps* outcaps)
