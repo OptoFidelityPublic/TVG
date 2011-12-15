@@ -423,9 +423,10 @@ gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
   {
     gint64 frame_number = gst_oftvg_get_frame_number(filter, buf);
     filter->process_inplace(GST_BUFFER_DATA(buf), filter, (int) frame_number);
-    gst_oftvg_frame_counter_advance(filter);
     gst_oftvg_process_ip_end_timing(filter, timer1);
   }
+
+  gst_oftvg_frame_counter_advance(filter);
 
   return ret;
 }
