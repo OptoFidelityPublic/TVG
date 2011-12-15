@@ -309,7 +309,7 @@ gst_oftvg_get_property (GObject * object, guint prop_id,
 static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event)
 {
   GstOFTVG *filter = GST_OFTVG(base);
-
+  
   // Block the events related to the repeat seek from propagating downstream.
   // We kind of split the pipeline in half: upstream seeks back to the start of video
   // while downstream keeps going.
@@ -368,6 +368,16 @@ static GstFlowReturn gst_oftvg_handle_frame_numbers(
   {
     //g_print("frame %d (%d / %d)\n", (int) frame_number, (int) max_frame_number,
     //  filter->repeat_count);
+  }
+
+  if (frame_number % 10 == 0)
+  {
+	  // Just show some feedback to user.
+	  // Currently displayed regardless of the 'silent' attribute, because setting silent=0
+	  // also prints some debug stuff.
+	  g_print("Progress: %0.1f%% (%0.1f seconds) complete\n",
+		  (float)(max_frame_number * filter->repeat_count + frame_number) / (max_frame_number * (filter->repeat + 1)) * 100,
+		  (float)(GST_BUFFER_TIMESTAMP(buf) + filter->timestamp_offset) / GST_SECOND); 
   }
 
   if (frame_number >= max_frame_number
