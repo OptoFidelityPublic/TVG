@@ -82,6 +82,8 @@ struct _GstOFTVG {
   guint8 bit_off_color[4];
   guint8 bit_on_color[4];
 
+  /* timestamp offset for repeating frames */
+  GstClockTime timestamp_offset;
 };
 
 struct _GstOFTVGClass {

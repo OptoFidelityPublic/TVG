@@ -1,4 +1,4 @@
-Libraries.zip pit‰‰ purkaa ennen k‰‰nt‰mist‰. Se sis‰lt‰‰ OSSBuildsin mukana tulevat gstreamer-kirjastot, jotta niihin voi viitata suhteellisilla poluilla absoluuttisten sijaan.
+ÔªøLibraries.zip pit‰‰ purkaa ennen k‰‰nt‰mist‰. Se sis‰lt‰‰ OSSBuildsin mukana tulevat gstreamer-kirjastot, jotta niihin voi viitata suhteellisilla poluilla absoluuttisten sijaan.
 
 
 
@@ -106,3 +106,9 @@ Matalampi bitrate x264encille nopeuttaa pakkaamista.
 speed-preset:ll√§ on huomattava vaikutus pakkausnopeuteen.
 
 --
+
+Videosink l√§hett√§√§ oletuksena QOS-eventtej√§, jotka aiheuttavat kaikenlaista
+j√§nn√§√§ kun videota seekataan. Sain aikaiseksi ainakin tilanteen, jossa 1. repeatin
+j√§lkeen l√§hdetiedostosta haetaan vain joka 30. frame. T√§m√§ ei vaikuta tiedostoon
+kirjoitukseen, ja n√§yt√∂lle piirrett√§ess√§ sen saa pois n√§in:
+! ffmpegcolorspace ! dshowvideosink qos=false

@@ -138,6 +138,7 @@ static gboolean gst_oftvg_set_caps(GstBaseTransform* btrans,
   GstCaps* incaps, GstCaps* outcaps);
 
 static gboolean gst_oftvg_set_process_function(GstOFTVG* filter);
+static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event);
 
 /* GObject vmethod implementations */
 
@@ -223,6 +224,7 @@ gst_oftvg_class_init (GstOFTVGClass * klass)
     g_param_spec_boolean ("silent", "Silent", "Produce verbose output ?",
           FALSE, (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
 
+  btrans->event = GST_DEBUG_FUNCPTR(gst_oftvg_event);
   btrans->transform_ip = GST_DEBUG_FUNCPTR(gst_oftvg_transform_ip);
   btrans->set_caps     = GST_DEBUG_FUNCPTR(gst_oftvg_set_caps);
 }
@@ -242,6 +244,7 @@ gst_oftvg_init (GstOFTVG* filter, GstOFTVGClass* klass)
   filter->frame_counter = 0;
 
   filter->repeat_count = 1;
+  filter->timestamp_offset = 0;
 
   if (!filter->silent)
   {
@@ -303,6 +306,25 @@ gst_oftvg_get_property (GObject * object, guint prop_id,
   }
 }
 
+static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event)
+{
+  GstOFTVG *filter = GST_OFTVG(base);
+
+  // Block the events related to the repeat seek from propagating downstream.
+  // We kind of split the pipeline in half: upstream seeks back to the start of video
+  // while downstream keeps going.
+  if (GST_EVENT_TYPE(event) == GST_EVENT_FLUSH_START && filter->repeat_count > 1)
+	  return FALSE;
+
+  if (GST_EVENT_TYPE(event) == GST_EVENT_FLUSH_STOP && filter->repeat_count > 1)
+	  return FALSE;
+
+  if (GST_EVENT_TYPE(event) == GST_EVENT_NEWSEGMENT && filter->repeat_count > 1)
+	  return FALSE;
+
+  return TRUE;
+}
+
 /* timing helpers */
 static void gst_oftvg_process_ip_begin_timing(GstOFTVG* filter)
 {
@@ -348,7 +370,7 @@ static GstFlowReturn gst_oftvg_handle_frame_numbers(
     //  filter->repeat_count);
   }
 
-  if (frame_number > max_frame_number
+  if (frame_number >= max_frame_number
     && filter->repeat_count < filter->repeat)
   {
     if (!filter->silent)
@@ -366,8 +388,12 @@ static GstFlowReturn gst_oftvg_handle_frame_numbers(
         ("gstoftvg: seek"));
       return GST_FLOW_ERROR;
     }
+
+	// Keep the timestamps we output sequential.
+	filter->timestamp_offset = GST_BUFFER_TIMESTAMP(buf) + GST_BUFFER_DURATION(buf);
+
     gst_oftvg_frame_counter_init(filter, 0);
-    return GST_FLOW_UNEXPECTED;
+    return GST_FLOW_OK;
   }
 
   if ((frame_number > max_frame_number)
@@ -417,7 +443,8 @@ gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
     // Reported elsewhere
     return GST_FLOW_ERROR;
   }
-
+  
+  GST_BUFFER_TIMESTAMP(buf) += filter->timestamp_offset;
   GstFlowReturn ret = gst_oftvg_handle_frame_numbers(filter, buf);
   if (GST_FLOW_IS_SUCCESS(ret))
   {
