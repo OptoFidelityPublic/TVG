@@ -140,6 +140,8 @@ static GstFlowReturn gst_oftvg_transform_ip (GstBaseTransform * base,
 static gboolean gst_oftvg_set_caps(GstBaseTransform* btrans,
   GstCaps* incaps, GstCaps* outcaps);
 
+static GstOFTVGLayout& gst_oftvg_get_layout(GstOFTVG* filter);
+
 static gboolean gst_oftvg_set_process_function(GstOFTVG* filter);
 static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event);
 
@@ -523,8 +525,9 @@ gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
   timemeasure_t timer1 = begin_timing();
 
   GstOFTVG *filter = GST_OFTVG(base);
+  const GstOFTVGLayout& layout = gst_oftvg_get_layout(filter);
 
-  if (filter->layout.length() == 0)
+  if (layout.length() == 0)
   {
     // Reported elsewhere
     return GST_FLOW_ERROR;
@@ -535,7 +538,8 @@ gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
   if (GST_FLOW_IS_SUCCESS(ret))
   {
     gint64 frame_number = gst_oftvg_get_frame_number(filter, buf);
-    filter->process_inplace(GST_BUFFER_DATA(buf), filter, (int) frame_number);
+    filter->process_inplace(GST_BUFFER_DATA(buf), filter, (int) frame_number,
+      layout);
     gst_oftvg_process_ip_end_timing(filter, timer1);
   }
 
@@ -696,7 +700,8 @@ static GstOFTVGLayout& gst_oftvg_get_layout(GstOFTVG* filter)
 /// determined by filter->color.
 /// Note: gst_oftvg_set_process_function determines
 /// which processing function to use.
-void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter, int frame_number)
+void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter, int frame_number,
+  const GstOFTVGLayout& layout)
 {
   GstVideoFormat format = filter->in_format;
 
@@ -719,8 +724,6 @@ void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter, int frame_number)
   int uv_stride = gst_video_format_get_row_stride(format, 1, width);
   int uoff = gst_video_format_get_pixel_stride(format, 1);
   int voff = gst_video_format_get_pixel_stride(format, 2);
-
-  const GstOFTVGLayout& layout = gst_oftvg_get_layout(filter);
 
   if (layout.length() != 0)
   {

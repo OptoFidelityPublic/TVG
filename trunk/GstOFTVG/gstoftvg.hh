@@ -82,7 +82,8 @@ struct _GstOFTVG {
   int repeat;
 
   /* processing function */
-  void (*process_inplace)(guint8 *buf, GstOFTVG *filter, int frame_number);
+  void (*process_inplace)(guint8 *buf, GstOFTVG *filter, int frame_number,
+    const GstOFTVGLayout& layout);
 
   /* precalculated values */
   guint8 bit_off_color[4];
