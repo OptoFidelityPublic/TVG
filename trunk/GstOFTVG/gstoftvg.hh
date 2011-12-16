@@ -58,30 +58,35 @@ struct _GstOFTVG {
 
   /* internal state */
   
-  /// How many times to repeat the frames.
+  /// Which round is it? 0 = calibration frames, 1 = first round, ...
   int repeat_count;
   /// Number of frames to process. If -1, the number is determined by
   /// the layout.
   int num_buffers;
 
+  GstOFTVGLayout calibration_layout;
   GstOFTVGLayout layout;
 
   /// Plugin's internal frame counter.
   gint64 frame_counter;
 
+  // Previously reported timestamp
+  GstClockTime progress_timestamp;
+
   /* properties */
   gboolean silent;
   gchar* layout_location;
+  /// Produce n more calibration frames
+  int calibration_frames;
   /// Repeat first x frames n times.
   int repeat;
-  
+
   /* processing function */
   void (*process_inplace)(guint8 *buf, GstOFTVG *filter, int frame_number);
 
   /* precalculated values */
   guint8 bit_off_color[4];
   guint8 bit_on_color[4];
-
   /* timestamp offset for repeating frames */
   GstClockTime timestamp_offset;
 };

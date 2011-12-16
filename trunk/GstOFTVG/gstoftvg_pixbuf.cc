@@ -28,6 +28,7 @@
 
 #include <glib.h>
 
+#include <gst/gst.h>
 #include <gdk-pixbuf/gdk-pixbuf.h>
 
 #include "gstoftvg_layout.hh"
@@ -36,6 +37,7 @@
 const static int gst_oftvg_BITS_PER_SAMPLE = 8;
 
 static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
+  OFTVG::OverlayMode overlay_mode,
   int x, int y, int width, int height,
   int red, int green, int blue)
 {
@@ -48,11 +50,19 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
   if (red == green && green == blue)
   {
     int val = red;
-    if (val % 10 == 0 && val >= 10 && val <= 240)
+    if (val >= 10 && val <= 240 && val % 10 == 0)
     {
+      // Frame id mark
       int frameid_n = val / 10;
       gboolean isSyncMark = false;
-      layout->addPixel(x, y, frameid_n, isSyncMark);
+      if (overlay_mode == OFTVG::OVERLAY_MODE_CALIBRATION)
+      {
+        layout->addPixel(x, y, 0, isSyncMark);
+      }
+      else
+      {
+        layout->addPixel(x, y, frameid_n, isSyncMark);
+      }
     }
   }
   else
@@ -63,6 +73,7 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
       if (red == syncMarks[i][0] && green == syncMarks[i][1]
       && blue == syncMarks[i][2])
       {
+        // Sync mark
         int frameid_n = i + 1;
         gboolean isSyncMark = true;
         layout->addPixel(x, y, frameid_n, isSyncMark);
@@ -71,9 +82,21 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
   }
 }
 
+/// Initialize a white background for calibration layout
+static void gst_oftvg_init_calibration_layout_bg(GstOFTVGLayout* layout,
+  int width, int height)
+{
+  int x = 0;
+  int y = 0;
+  bool isSyncMark = false;
+  int frame_id = 0;
+  GstOFTVGElement element(x, y, width, height, isSyncMark, 0, 1, 0);
+  layout->addElement(element);
+}
+
 /// Initialize a layout from a bitmap.
 static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
-  GstOFTVGLayout* layout)
+  GstOFTVGLayout* layout, OFTVG::OverlayMode overlay_mode)
 {
   int width = gdk_pixbuf_get_width(buf);
   int height = gdk_pixbuf_get_height(buf);
@@ -81,6 +104,11 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
   int rowstride = gdk_pixbuf_get_rowstride(buf);
   const guchar* const pixels = gdk_pixbuf_get_pixels(buf);
   int n_channels = gdk_pixbuf_get_n_channels(buf);
+
+  if (overlay_mode == OFTVG::OVERLAY_MODE_CALIBRATION)
+  {
+    gst_oftvg_init_calibration_layout_bg(layout, width, height);
+  }
 
   for (int y = 0; y < height; ++y)
   {
@@ -92,7 +120,7 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
       int blue = p[2];
       int pixelWidth = 1;
       int pixelHeight = 1;
-      gst_oftvg_addElementFromRGB(layout,
+      gst_oftvg_addElementFromRGB(layout, overlay_mode,
             x,
             y,
             pixelWidth,
@@ -116,7 +144,8 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
  * @param height The target height of the layout.
  */
 gboolean gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,
-  GstOFTVGLayout* layout, int width, int height)
+  GstOFTVGLayout* layout, int width, int height,
+  OFTVG::OverlayMode overlay_mode)
 {
   GdkPixbuf* origbuf = gdk_pixbuf_new_from_file(filename, error);
   if (origbuf == NULL)
@@ -141,7 +170,7 @@ gboolean gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,
     gdk_pixbuf_scale_simple(origbuf, width, height, GDK_INTERP_NEAREST);
   gdk_pixbuf_unref(origbuf);
 
-  gst_oftvg_init_layout_from_bitmap(buf, layout);
+  gst_oftvg_init_layout_from_bitmap(buf, layout, overlay_mode);
   gdk_pixbuf_unref(buf);
 
   return TRUE;

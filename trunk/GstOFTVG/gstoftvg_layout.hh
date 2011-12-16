@@ -34,10 +34,16 @@
 #define __GSTOFTVG_LAYOUT_HH__
 
 #include <vector>
+#include <glib.h>
 
-#include <gst/gst.h>
-
-G_BEGIN_DECLS
+namespace OFTVG
+{
+  enum OverlayMode
+  {
+    OVERLAY_MODE_DEFAULT,
+    OVERLAY_MODE_CALIBRATION
+  };
+}
 
 class GstOFTVGLayout;
 
@@ -135,6 +141,5 @@ private:
   int frameidBits_;
 };
 
-G_END_DECLS
 
 #endif /* __GST_OFTVG_LAYOUT_HH__ */

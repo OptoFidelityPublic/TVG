@@ -35,9 +35,6 @@ GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
 : x_(x), y_(y), width_(width), height_(height),
     isSyncMark_(isSyncMark), offset_(offset), period_(period), duty_(duty)
 {
-  // For simplicity only elements of height 1 are currently
-  // implemented for rendering.
-  g_assert(height == 1);
 }
 
 GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
@@ -46,9 +43,10 @@ GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
     isSyncMark_(isSyncMark),
     offset_(0), period_(1 << frameid_n), duty_(1 << (frameid_n - 1))
 {
-  // For simplicity only elements of height 1 are currently
-  // implemented for rendering.
-  g_assert(height == 1);
+  if (frameid_n == 0)
+  {
+    duty_ = 1;
+  }
 }
 
 /// Returns whether the properties apart from location and
@@ -109,8 +107,27 @@ void GstOFTVGLayout::clear()
 
 void GstOFTVGLayout::addElement(const GstOFTVGElement& element)
 {
-  // Copy element
-  elements_.push_back(element);
+  // For simplicity only elements of height 1 are currently
+  // implemented for rendering.
+
+  if (element.height() == 1)
+  {
+    // Copy element
+    elements_.push_back(element);
+  }
+  else
+  {
+    // Lets break it down to one pixel high elements.
+    for (int y = element.y(); y < element.y() + element.height(); ++y)
+    {
+      // Copy element
+      GstOFTVGElement rowElement(element);
+      rowElement.height_ = 1;
+      rowElement.y_ = y;
+      
+      addElement(rowElement);
+    }
+  }
 }
 
 int GstOFTVGLayout::length() const

@@ -25,11 +25,7 @@
 #ifndef __GSTOFTVG_PIXBUF_H__
 #define __GSTOFTVG_PIXBUF_H__
 
-#include <vector>
-
-#include <gst/gst.h>
-#include <gst/video/video.h>
-#include <gst/base/gstbasetransform.h>
+#include <glib.h>
 
 G_BEGIN_DECLS
 
@@ -47,7 +43,8 @@ class GstOFTVGLayout;
  * @param height The target height of the layout.
  */
 gboolean gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,
-  GstOFTVGLayout* layout, int width, int height);
+  GstOFTVGLayout* layout, int width, int height,
+  OFTVG::OverlayMode overlay_mode);
 
 G_END_DECLS
 

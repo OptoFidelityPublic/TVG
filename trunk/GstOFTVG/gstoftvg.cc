@@ -36,8 +36,6 @@
 #include "config.h"
 #endif
 
-#include <math.h>
-
 #include <gst/gst.h>
 #include <gst/base/gstbasetransform.h>
 #include <gst/video/video.h>
@@ -62,6 +60,7 @@ static const gchar* const DEFAULT_LAYOUT_LOCATION =
   //"../layout/test-layout-1920x355-c.bmp";
   //"../layout/test-layout-1920x1080-b.png";
 
+static const int DEFAULT_CALIBRATION_FRAMES = 0;
 static const int DEFAULT_REPEAT = 1;
 static const int DEFAULT_NUM_BUFFERS = 0;
 
@@ -75,6 +74,7 @@ enum
 enum
 {
   PROP_0,
+  PROP_CALIBRATION_FRAMES,
   PROP_NUMBUF,
   PROP_LOCATION,
   PROP_REPEAT,
@@ -131,6 +131,9 @@ static void gst_oftvg_set_property (GObject * object, guint prop_id,
 static void gst_oftvg_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
 
+static gint64 gst_oftvg_get_frame_number(GstOFTVG* const filter,
+  const GstBuffer* const buf);
+
 static GstFlowReturn gst_oftvg_transform_ip (GstBaseTransform * base,
     GstBuffer * outbuf);
 
@@ -171,16 +174,20 @@ static void gst_oftvg_frame_counter_advance(GstOFTVG* const filter)
 }
 
 /// Gets the frame number
+/// @param buf The buffer. Or null if no buffer at hand.
 static gint64 gst_oftvg_get_frame_number(GstOFTVG* const filter,
   const GstBuffer* const buf)
 {
-  // For video frames, buf->offset is the frame number of this buffer.
-  // By qtdemux and oggdemux offset seems to be constantly -1.
-  // Lets use our internal frame counter then.
-  if ((gint64) buf->offset >= 0)
+  if (buf != NULL)
   {
-    //g_print("offset >= 0 %d\n", (int) buf->offset);
-    gst_oftvg_frame_counter_init(filter, buf->offset);
+    // For video frames, buf->offset is the frame number of this buffer.
+    // By qtdemux and oggdemux offset seems to be constantly -1.
+    // Lets use our internal frame counter then.
+    if ((gint64) buf->offset >= 0)
+    {
+      //g_print("offset >= 0 %d\n", (int) buf->offset);
+      gst_oftvg_frame_counter_init(filter, buf->offset);
+    }
   }
   return filter->frame_counter;
 }
@@ -205,13 +212,19 @@ gst_oftvg_class_init (GstOFTVGClass * klass)
   gobject_class->set_property = gst_oftvg_set_property;
   gobject_class->get_property = gst_oftvg_get_property;
 
+  g_object_class_install_property(gobject_class, PROP_CALIBRATION_FRAMES,
+    g_param_spec_int ("calibration-frames", "Calibration frames",
+      "Number of calibration frames to produce.",
+      0, G_MAXINT, DEFAULT_CALIBRATION_FRAMES,
+      (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
+
   g_object_class_install_property(gobject_class, PROP_LOCATION,
     g_param_spec_string ("location", "Location", "Layout bitmap file location",
       DEFAULT_LAYOUT_LOCATION,
       (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
 
   g_object_class_install_property(gobject_class, PROP_NUMBUF,
-    g_param_spec_int ("num-buffers", "numbuf", "Number of buffers to process.",
+    g_param_spec_int ("num-buffers", "num-buffers", "Number of buffers to process.",
       0, G_MAXINT, DEFAULT_NUM_BUFFERS,
       (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
 
@@ -239,11 +252,13 @@ gst_oftvg_init (GstOFTVG* filter, GstOFTVGClass* klass)
 
   filter->silent = FALSE;
   filter->layout_location = g_strdup(DEFAULT_LAYOUT_LOCATION);
+  filter->calibration_frames = DEFAULT_CALIBRATION_FRAMES;
   filter->repeat = DEFAULT_REPEAT;
+  // Start with calibration frames.
+  filter->repeat_count = 0;
   filter->num_buffers = DEFAULT_NUM_BUFFERS;
   filter->frame_counter = 0;
-
-  filter->repeat_count = 1;
+  filter->progress_timestamp = G_MININT64;
   filter->timestamp_offset = 0;
 
   if (!filter->silent)
@@ -259,6 +274,9 @@ gst_oftvg_set_property (GObject * object, guint prop_id,
   GstOFTVG *filter = GST_OFTVG (object);
 
   switch (prop_id) {
+    case PROP_CALIBRATION_FRAMES:
+      filter->calibration_frames = g_value_get_int(value);
+      break;
     case PROP_LOCATION:
       if (filter->layout_location != NULL)
       {
@@ -288,6 +306,9 @@ gst_oftvg_get_property (GObject * object, guint prop_id,
   GstOFTVG *filter = GST_OFTVG (object);
 
   switch (prop_id) {
+    case PROP_CALIBRATION_FRAMES:
+      g_value_set_int(value, filter->calibration_frames);
+      break;
     case PROP_LOCATION:
       g_value_set_string(value, filter->layout_location);
       break;
@@ -308,21 +329,39 @@ gst_oftvg_get_property (GObject * object, guint prop_id,
 
 static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event)
 {
-  GstOFTVG *filter = GST_OFTVG(base);
-  
-  // Block the events related to the repeat seek from propagating downstream.
-  // We kind of split the pipeline in half: upstream seeks back to the start of video
-  // while downstream keeps going.
-  if (GST_EVENT_TYPE(event) == GST_EVENT_FLUSH_START && filter->repeat_count > 1)
-	  return FALSE;
+  GstOFTVG* filter = GST_OFTVG(base);
+  gboolean ret;
 
-  if (GST_EVENT_TYPE(event) == GST_EVENT_FLUSH_STOP && filter->repeat_count > 1)
-	  return FALSE;
+  switch (GST_EVENT_TYPE(event))
+  {
+    case GST_EVENT_FLUSH_START:
+    case GST_EVENT_FLUSH_STOP:
+    case GST_EVENT_NEWSEGMENT:
+      // Block the events related to the repeat seek from propagating downstream.
+      // We kind of split the pipeline in half: upstream seeks back to the start
+      // of video while downstream keeps going.
+      if (filter->repeat_count > 0)
+      {
+        // drop event
+        ret = FALSE;
+      }
+      break;
+    case GST_EVENT_EOS:
+      if (gst_oftvg_get_frame_number(filter, NULL)
+          < gst_oftvg_get_max_frame_number(filter))
+      {
+        GST_ELEMENT_WARNING(filter, STREAM, FAILED,
+          ("Stream ended prematurely."), (NULL));
+      }
+      // Pass on.
+      ret = TRUE;
+      break;
+    default:
+      ret = TRUE;
+      break;
+  }
 
-  if (GST_EVENT_TYPE(event) == GST_EVENT_NEWSEGMENT && filter->repeat_count > 1)
-	  return FALSE;
-
-  return TRUE;
+  return ret;
 }
 
 /* timing helpers */
@@ -359,25 +398,61 @@ static void gst_oftvg_process_ip_end_timing(GstOFTVG* filter,
   }
 }
 
+/* Progress reporting */
+static void gst_oftvg_report_progress(GstOFTVG* filter, GstBuffer* buf)
+{
+  gint64 frame_number = gst_oftvg_get_frame_number(filter, buf);
+  gint64 max_frame_number = gst_oftvg_get_max_frame_number(filter);
+
+  GstClockTime timestamp = GST_BUFFER_TIMESTAMP(buf);
+
+  if (timestamp / GST_SECOND - filter->progress_timestamp / GST_SECOND != 0)
+  {
+    filter->progress_timestamp = timestamp;
+
+	// Just show some feedback to user.
+	// Currently displayed regardless of the 'silent' attribute, because
+    // setting silent=0 also prints some debug stuff.
+    gint64 frames_done =
+      max_frame_number * filter->repeat_count + frame_number;
+    gint64 total_frames = max_frame_number * (filter->repeat + 1);
+    float progress =
+      ((float) frames_done) * 100 / total_frames;
+    float timestamp_seconds = ((float) GST_BUFFER_TIMESTAMP(buf)) / GST_SECOND;
+
+    g_print("Progress: %0.1f%% (%0.1f seconds) complete\n",
+      progress, timestamp_seconds);
+  }
+}
+
+/* Frame number, repeat, calibration frames */
+
 static GstFlowReturn gst_oftvg_handle_frame_numbers(
   GstOFTVG* filter, GstBuffer* buf)
 {
   gint64 frame_number = gst_oftvg_get_frame_number(filter, buf);
   gint64 max_frame_number = gst_oftvg_get_max_frame_number(filter);
+  
   if (!filter->silent)
   {
-    //g_print("frame %d (%d / %d)\n", (int) frame_number, (int) max_frame_number,
-    //  filter->repeat_count);
+    // DEBUG
+    //g_print("frame %d (%d / %d) [ts: %0.3f]\n", (int) frame_number,
+    //  (int) max_frame_number, filter->repeat_count,
+    //  ((double) buf->timestamp) / GST_SECOND);
   }
 
-  if (frame_number % 10 == 0)
+  gst_oftvg_report_progress(filter, buf);
+
+  gboolean do_repeat = false;
+  if (filter->repeat_count == 0 && filter->calibration_frames == 0)
   {
-	  // Just show some feedback to user.
-	  // Currently displayed regardless of the 'silent' attribute, because setting silent=0
-	  // also prints some debug stuff.
-	  g_print("Progress: %0.1f%% (%0.1f seconds) complete\n",
-		  (float)(max_frame_number * filter->repeat_count + frame_number) / (max_frame_number * (filter->repeat + 1)) * 100,
-		  (float)GST_BUFFER_TIMESTAMP(buf) / GST_SECOND); 
+    // There was no calibration frames.
+    filter->repeat_count++;
+  }
+  else if (filter->repeat_count == 0)
+  {
+    // Calibration frames.
+    max_frame_number = filter->calibration_frames - 1;
   }
 
   if (frame_number >= max_frame_number
@@ -425,11 +500,12 @@ static GstFlowReturn gst_oftvg_handle_frame_numbers(
     bus depending on the mode of operation)."
     http://gstreamer.freedesktop.org/data/doc/gstreamer/head/pwg/html/section-events-definitions.html
     */
-    gst_pad_push_event(filter->element.srcpad, gst_event_new_flush_start());
-    gst_pad_push_event(filter->element.srcpad, gst_event_new_flush_stop());
     gst_pad_push_event(filter->element.srcpad, gst_event_new_eos());
     return GST_FLOW_UNEXPECTED;
   }
+
+  gst_oftvg_frame_counter_advance(filter);
+
   return GST_FLOW_OK;
 }
 
@@ -462,8 +538,6 @@ gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
     filter->process_inplace(GST_BUFFER_DATA(buf), filter, (int) frame_number);
     gst_oftvg_process_ip_end_timing(filter, timer1);
   }
-
-  gst_oftvg_frame_counter_advance(filter);
 
   return ret;
 }
@@ -516,8 +590,19 @@ static void gst_oftvg_init_layout(GstOFTVG* filter)
   filter->layout.clear();
   const gchar* filename = filter->layout_location;
   GError* error = NULL;
+
+  gst_oftvg_load_layout_bitmap(filename, &error, &filter->calibration_layout,
+    filter->width, filter->height, OFTVG::OVERLAY_MODE_CALIBRATION);
+
+  if (error != NULL)
+  {
+    GST_ELEMENT_ERROR(filter, RESOURCE, OPEN_READ,
+      ("Could not open layout file: %s. %s", filename, error->message),
+      (NULL));
+  }
+
   gst_oftvg_load_layout_bitmap(filename, &error, &filter->layout,
-    filter->width, filter->height);
+    filter->width, filter->height, OFTVG::OVERLAY_MODE_DEFAULT);
 
   if (error != NULL)
   {
@@ -595,7 +680,16 @@ static int gst_oftvg_get_subsampling_v_shift(GstVideoFormat format,
 
 static GstOFTVGLayout& gst_oftvg_get_layout(GstOFTVG* filter)
 {
-  return filter->layout;
+  GstOFTVGLayout* layout;
+  if (filter->repeat_count == 0)
+  {
+    layout = &(filter->calibration_layout);
+  }
+  else
+  {
+    layout = &(filter->layout);
+  }
+  return *layout;
 }
 
 /// Generic processing function. The color components to use are
