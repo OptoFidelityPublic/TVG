@@ -41,6 +41,7 @@ namespace OFTVG
   enum OverlayMode
   {
     OVERLAY_MODE_DEFAULT,
+    OVERLAY_MODE_WHITE,
     OVERLAY_MODE_CALIBRATION
   };
 }

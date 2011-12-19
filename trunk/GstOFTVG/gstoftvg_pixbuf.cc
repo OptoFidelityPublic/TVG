@@ -38,7 +38,7 @@ const static int gst_oftvg_BITS_PER_SAMPLE = 8;
 
 static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
   OFTVG::OverlayMode overlay_mode,
-  int x, int y, int width, int height,
+  int x, int y,
   int red, int green, int blue)
 {
   const int numSyncMarks = 2;
@@ -55,8 +55,13 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
       // Frame id mark
       int frameid_n = val / 10;
       gboolean isSyncMark = false;
-      if (overlay_mode == OFTVG::OVERLAY_MODE_CALIBRATION)
+      if (overlay_mode == OFTVG::OVERLAY_MODE_WHITE)
       {
+        // No marks.
+      }
+      else if (overlay_mode == OFTVG::OVERLAY_MODE_CALIBRATION)
+      {
+        // Paused frame id marks
         layout->addPixel(x, y, 0, isSyncMark);
       }
       else
@@ -76,7 +81,14 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
         // Sync mark
         int frameid_n = i + 1;
         gboolean isSyncMark = true;
-        layout->addPixel(x, y, frameid_n, isSyncMark);
+        if (overlay_mode == OFTVG::OVERLAY_MODE_WHITE)
+        {
+          // No marks.
+        }
+        else
+        {
+          layout->addPixel(x, y, frameid_n, isSyncMark);
+        }
       }
     }
   }
@@ -105,7 +117,8 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
   const guchar* const pixels = gdk_pixbuf_get_pixels(buf);
   int n_channels = gdk_pixbuf_get_n_channels(buf);
 
-  if (overlay_mode == OFTVG::OVERLAY_MODE_CALIBRATION)
+  if (overlay_mode == OFTVG::OVERLAY_MODE_CALIBRATION
+    || overlay_mode == OFTVG::OVERLAY_MODE_WHITE)
   {
     gst_oftvg_init_calibration_layout_bg(layout, width, height);
   }
@@ -118,13 +131,9 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
       int red = p[0];
       int green = p[1];
       int blue = p[2];
-      int pixelWidth = 1;
-      int pixelHeight = 1;
       gst_oftvg_addElementFromRGB(layout, overlay_mode,
             x,
             y,
-            pixelWidth,
-            pixelHeight,
             red, green, blue);
 
       p += n_channels * ((gst_oftvg_BITS_PER_SAMPLE + 7) / 8);

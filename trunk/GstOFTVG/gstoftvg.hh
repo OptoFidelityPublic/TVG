@@ -25,6 +25,8 @@
 #ifndef __GST_OFTVG_HH__
 #define __GST_OFTVG_HH__
 
+#include <vector>
+
 #include <gst/gst.h>
 #include <gst/video/video.h>
 #include <gst/base/gstbasetransform.h>
@@ -64,20 +66,26 @@ struct _GstOFTVG {
   /// the layout.
   int num_buffers;
 
-  GstOFTVGLayout calibration_layout;
+  std::vector<GstOFTVGLayout> calibration_layouts;
   GstOFTVGLayout layout;
 
   /// Plugin's internal frame counter.
   gint64 frame_counter;
 
-  // Previously reported timestamp
+  /// Previously reported timestamp
   GstClockTime progress_timestamp;
+
+  /// Timestamp offset for repeating frames
+  GstClockTime timestamp_offset;
+  
+  /// Frame count offset
+  gint64 frame_offset;
 
   /* properties */
   gboolean silent;
   gchar* layout_location;
-  /// Produce n more calibration frames
-  int calibration_frames;
+  /// Produce calibration frames in the beginning
+  gboolean calibration_prepend;
   /// Repeat first x frames n times.
   int repeat;
 
@@ -88,8 +96,6 @@ struct _GstOFTVG {
   /* precalculated values */
   guint8 bit_off_color[4];
   guint8 bit_on_color[4];
-  /* timestamp offset for repeating frames */
-  GstClockTime timestamp_offset;
 };
 
 struct _GstOFTVGClass {
