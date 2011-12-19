@@ -112,3 +112,19 @@ jännää kun videota seekataan. Sain aikaiseksi ainakin tilanteen, jossa 1. rep
 jälkeen lähdetiedostosta haetaan vain joka 30. frame. Tämä ei vaikuta tiedostoon
 kirjoitukseen, ja näytölle piirrettäessä sen saa pois näin:
 ! ffmpegcolorspace ! dshowvideosink qos=false
+
+--
+
+19.12.2011
+
+time (cd Media; GST_DEBUG=1 nice -n -5 gst-launch.exe 
+--gst-plugin-path='../Release' filesrc 
+location=big_buck_bunny_1080p_h264.mov ! decodebin2 ! queue2 
+max-size-bytes=20000000 ! oftvg calibration=prepend silent=false 
+location=../layout/test-layout-1920x1080-c.bmp ! queue2 
+max-size-bytes=20000000 ! x264enc speed-preset=4 bitrate=3000 ! avimux ! 
+filesink location=test9.avi )
+
+Timer  total_pipeline: 0.033097 (30.21 1/s)
+
+--

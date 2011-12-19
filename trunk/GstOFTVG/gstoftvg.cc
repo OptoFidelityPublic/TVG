@@ -450,12 +450,12 @@ static void gst_oftvg_process_ip_end_timing(GstOFTVG* filter,
       total_pipeline_timer = timer1;
     }
     timer_counter++;
-    if (timer_counter % 100 == 0)
+    if (timer_counter % 240 == 0)
     {
-      show_timing(total_oftvg_time / 100, "gst_oftvg_transform_ip");
+      show_timing(total_oftvg_time / 240, "gst_oftvg_transform_ip");
       total_oftvg_time = 0;
     }
-    if (timer_counter % 100 == 0)
+    if (timer_counter % 240 == 0)
     {
       double total_pipeline_time = end_timing(total_pipeline_timer,
         "total_pipeline");
@@ -484,7 +484,7 @@ static void gst_oftvg_report_progress(GstOFTVG* filter, GstBuffer* buf)
     gint64 frames_done = sink_frame_number;
     gint64 total_frames = gst_oftvg_get_max_sink_frame_number(filter, buf);
     float progress =
-      ((float) frames_done) * 100 / ((float) total_frames + 0.0001);
+      ((float) frames_done) * 100 / ((float) total_frames + 0.0001f);
     float timestamp_seconds = ((float) GST_BUFFER_TIMESTAMP(buf)) / GST_SECOND;
 
     g_print("Progress: %0.1f%% (%0.1f seconds) complete\n",
@@ -546,8 +546,12 @@ static GstFlowReturn gst_oftvg_handle_frame_numbers(
   {
     // Calibration frames. No frame limit. Just time limit.
     max_frame_number = G_MAXINT64;
-    if (buf->timestamp < 10 * GST_SECOND
-      && buf->timestamp + buf->duration >= 10 * GST_SECOND)
+    GstClockTime ts = calibrationTimestamps[numCalibrationTimestamps-1];
+    // There are two syncmarks. So let's repeat when both syncmarks are on
+    // so there will not be a bump in the synchronization marks.
+    int syncFrames = 1 << 2;
+    if (buf->timestamp + buf->duration >= ts
+      && (frame_number + 1) % syncFrames == 0)
     {
       filter->repeat_count++;
       return gst_oftvg_repeat(filter, buf);
