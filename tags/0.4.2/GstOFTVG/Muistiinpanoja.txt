@@ -1,0 +1,130 @@
+﻿Libraries.zip pit�� purkaa ennen k��nt�mist�. Se sis�lt�� OSSBuildsin mukana tulevat gstreamer-kirjastot, jotta niihin voi viitata suhteellisilla poluilla absoluuttisten sijaan.
+
+
+
+Esimerkkikomento pluginin testaukseen:
+
+Ajetaan siell� hakemistossa, mihin GstOFTVG.dll on k��nnetty:
+
+gst-launch --gst-plugin-load=GstOFTVG.dll filesrc location=big_buck_bunny_1080p_h264.mov ! decodebin ! oftvg ! autovideosink
+
+
+--
+
+Use GST_ELEMENT_ERROR when reporting fatal errors if bitmap
+cannot be loaded.
+
+
+--
+
+7.12.2011
+
+gstreamermm is C++ bindings for gstreamer.
+
+http://ftp.gnome.org/pub/GNOME/sources/gstreamermm/0.10/
+
+gstreamermm is not currently available for Visual Studio.
+
+http://mail.gnome.org/archives/gtkmm-list/2011-August/msg00038.html
+http://mail.gnome.org/archives/gtkmm-list/2011-August/msg00040.html
+
+--
+
+8.12.2011
+
+gst-launch.exe --gst-plugin-path=../Debug filesrc location=../../GstOFTVG/Media/big_buck_bunny_1080p_h264.mov ! decodebin ! oftvg ! autovideosink
+
+--
+
+13.12.2011
+
+decodebin is deprecated. decodebin2 should be used instead.
+
+filesrc element with *.mov and *.ogg files won't produce 
+meaningful buf->offset values but just -1.
+
+--
+
+13.12.2011
+
+
+$ time (cd Release; gst-launch.exe -v --gst-plugin-path='.' filesrc 
+location=../Media/big_buck_bunny_1080p_h264.mov ! decodebin2 ! queue2 ! 
+oftvg location=../layout/test-layout-1920x1080-c.bmp silent=false 
+num-buffers=256 repeat=8 ! queue2 ! x264enc ! queue2 ! avimux ! filesink 
+location=test3.avi)
+
+real	1m52.597s
+user	0m0.031s
+sys	0m0.000s
+
+
+--
+
+
+$ time (cd Release; gst-launch.exe -v --gst-plugin-path='.' filesrc 
+location=../Media/big_buck_bunny_1080p_h264.mov ! decodebin2 ! videoscale 
+! video/x-raw-yuv,width=1920 ! queue2 ! oftvg 
+location=../layout/test-layout-1920x1080-c.bmp silent=false 
+num-buffers=512 repeat=2 ! queue2 ! x264enc speed-preset=4 ! queue2 ! 
+avimux ! filesink location=test4.avi)
+
+real	0m32.042s
+user	0m0.015s
+sys	0m0.015s
+
+--
+
+$ time (cd Release; gst-launch.exe -v --gst-plugin-path='.' filesrc 
+location=../Media/big_buck_bunny_1080p_h264.mov ! decodebin2 ! queue2 
+max-size-bytes=20000000 ! oftvg 
+location=../layout/test-layout-1920x1080-c.bmp silent=false 
+num-buffers=4096 repeat=32 ! queue2 max-size-bytes=20000000 ! x264enc 
+speed-preset=4 bitrate=15000 ! queue2 max-size-bytes=20000000 ! avimux ! 
+filesink location=test4.avi)
+
+...
+
+Timer total_pipeline_timer: 0.037701 (26.52 / s)
+
+real	82m26.888s
+user	0m0.000s
+sys	0m0.030s
+
+--
+
+queue2:n ajatuksena hyödyntää rinnakkaisuutta pitämällä puskurissa
+dataa kullekin putken vaiheelle. Ei mittaustietoa onko käytännön
+hyötyä suorituskykyyn.
+
+queue2:n parametrit
+  max-size-time
+  max-size-buffers
+  max-size-bytes
+
+Matalampi bitrate x264encille nopeuttaa pakkaamista.
+speed-preset:llä on huomattava vaikutus pakkausnopeuteen.
+
+--
+
+Videosink lähettää oletuksena QOS-eventtejä, jotka aiheuttavat kaikenlaista
+jännää kun videota seekataan. Sain aikaiseksi ainakin tilanteen, jossa 1. repeatin
+jälkeen lähdetiedostosta haetaan vain joka 30. frame. Tämä ei vaikuta tiedostoon
+kirjoitukseen, ja näytölle piirrettäessä sen saa pois näin:
+! ffmpegcolorspace ! dshowvideosink qos=false
+
+--
+
+19.12.2011
+
+time (cd Media; GST_DEBUG=1 nice -n -5 gst-launch.exe 
+--gst-plugin-path='../Release' filesrc 
+location=big_buck_bunny_1080p_h264.mov ! decodebin2 ! queue2 
+max-size-bytes=20000000 ! oftvg calibration=prepend silent=false 
+location=../layout/test-layout-1920x1080-c.bmp ! queue2 
+max-size-bytes=20000000 ! x264enc speed-preset=4 bitrate=3000 ! avimux ! 
+filesink location=test9.avi )
+
+Timer  total_pipeline: 0.033097 (30.21 1/s)
+
+--
