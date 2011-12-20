@@ -41,11 +41,11 @@
 #define Restrict restrict
 #endif
 
-namespace OFTVG
-{
-
 GST_DEBUG_CATEGORY_STATIC (gst_oftvg_debug);
 #define GST_CAT_DEFAULT gst_oftvg_debug
+
+namespace OFTVG
+{
 
 /// The timestamps where each calibration phase ends.
 static const int numCalibrationTimestamps = 2;
@@ -94,47 +94,47 @@ Oftvg::Oftvg()
 }
 
 /////////
-//
+// Initialization
 /////////
 
-bool Oftvg::gst_video_format_parse_caps(GstCaps* incaps)
+bool Oftvg::videoFormatSetCaps(GstCaps* incaps)
 {
   Oftvg* filter = this;
   return ::gst_video_format_parse_caps(incaps, &filter->in_format,
             &filter->width, &filter->height)?true:false;
 }
 
-bool Oftvg::gst_oftvg_init_params()
+bool Oftvg::initParams()
 {
   Oftvg* filter = this;
-  gst_oftvg_init_colorspace();
-  gst_oftvg_init_layout();
-  return gst_oftvg_set_process_function();
+  init_colorspace();
+  init_layout();
+  return set_process_function();
 }
 
-bool Oftvg::outputStreamEnded()
+bool Oftvg::atInputStreamEnd()
 {
-  return gst_oftvg_input_frame_number(NULL)
-          >= gst_oftvg_get_max_frame_number();
+  return input_frame_number(NULL)
+          >= get_max_frame_number();
 }
 
 /////////
 // Frame numbers
 /////////
 
-void Oftvg::gst_oftvg_frame_counter_init(gint64 frame_counter)
+void Oftvg::frame_counter_init(gint64 frame_counter)
 {
   Oftvg* filter = this;
   filter->frame_counter = frame_counter;
 }
 
-void Oftvg::gst_oftvg_frame_counter_advance()
+void Oftvg::frame_counter_advance()
 {
   Oftvg* filter = this;
   filter->frame_counter++;
 }
 
-gint64 Oftvg::gst_oftvg_output_frame_number(gint64 frame_number)
+gint64 Oftvg::output_frame_number(gint64 frame_number)
 {
   const Oftvg* filter = this;
   return frame_number + filter->frame_offset;
@@ -142,7 +142,7 @@ gint64 Oftvg::gst_oftvg_output_frame_number(gint64 frame_number)
 
 /// Gets the frame number
 /// @param buf The buffer. Or null if no buffer at hand.
-gint64 Oftvg::gst_oftvg_input_frame_number(const GstBuffer* buf)
+gint64 Oftvg::input_frame_number(const GstBuffer* buf)
 {
   Oftvg* filter = this;
   if (buf != NULL)
@@ -152,7 +152,7 @@ gint64 Oftvg::gst_oftvg_input_frame_number(const GstBuffer* buf)
     // Lets use our internal frame counter then.
     if ((gint64) GST_BUFFER_OFFSET(buf) >= 0)
     {
-      gst_oftvg_frame_counter_init(GST_BUFFER_OFFSET(buf));
+      frame_counter_init(GST_BUFFER_OFFSET(buf));
     }
   }
   return filter->frame_counter;
@@ -160,7 +160,7 @@ gint64 Oftvg::gst_oftvg_input_frame_number(const GstBuffer* buf)
 
 /// Gets the maximum source frame number, or -1 if no frames
 /// should be read.
-gint64 Oftvg::gst_oftvg_get_max_frame_number()
+gint64 Oftvg::get_max_frame_number()
 {
   const Oftvg* filter = this;
   gint64 max_frame_number = 0;
@@ -179,7 +179,7 @@ gint64 Oftvg::gst_oftvg_get_max_frame_number()
   return max_frame_number;
 }
 
-gint64 Oftvg::gst_oftvg_get_max_output_frame_number(const GstBuffer* buf)
+gint64 Oftvg::get_max_output_frame_number(const GstBuffer* buf)
 {
   const Oftvg* filter = this;
   gint64 calibration_frames = 0;
@@ -191,49 +191,22 @@ gint64 Oftvg::gst_oftvg_get_max_output_frame_number(const GstBuffer* buf)
       / GST_BUFFER_DURATION(buf);
   }
   return calibration_frames +
-    (gst_oftvg_get_max_frame_number() + 1) * filter->repeat;
+    (get_max_frame_number() + 1) * filter->repeat;
 }
 
-/* initialize the new element
- * initialize instance structure
- */
-void Oftvg::gst_oftvg_init()
-{
-  Oftvg* filter = this;
-
-  filter->silent = FALSE;
-  filter->layout_location = NULL;
-  filter->calibration_prepend = FALSE;
-  filter->repeat = 1;
-  // Start with calibration frames.
-  filter->repeat_count = 0;
-  filter->num_buffers = -1;
-  // use placement new, construct the object in the memory already allocated.
-  ::new (&(filter->layout)) GstOFTVGLayout();
-  filter->frame_counter = 0;
-  filter->progress_timestamp = G_MININT64;
-  filter->timestamp_offset = 0;
-  filter->frame_offset = 0;
-
-  if (!filter->silent)
-  {
-    GST_DEBUG("GstOFTVG initialized.\n");
-  }
-}
-
-bool Oftvg::gst_oftvg_set_process_function()
+bool Oftvg::set_process_function()
 {
   Oftvg* filter = this;
   if (gst_video_format_is_yuv(filter->in_format)
     || gst_video_format_is_rgb(filter->in_format))
   {
-    filter->process_inplace = &Oftvg::gst_oftvg_process_default;
+    filter->process_inplace = &Oftvg::process_default;
   }
   
   return filter->process_inplace != NULL;
 }
 
-void Oftvg::gst_oftvg_init_colorspace()
+void Oftvg::init_colorspace()
 {
   Oftvg* filter = this;
   const guint8 bit_on_color_yuv[4] = { 255, 128, 128, 0 };
@@ -262,7 +235,7 @@ void Oftvg::gst_oftvg_init_colorspace()
     bit_off_color, sizeof(guint8)*4);
 }
 
-void Oftvg::gst_oftvg_init_layout()
+void Oftvg::init_layout()
 {
   Oftvg* filter = this;
   OFTVG::OverlayMode calibrationModes[2] =
@@ -302,12 +275,12 @@ void Oftvg::gst_oftvg_init_layout()
 }
 
 /* Progress reporting */
-void Oftvg::gst_oftvg_report_progress(GstBuffer* buf)
+void Oftvg::report_progress(GstBuffer* buf)
 {
   Oftvg* filter = this;
-  gint64 frame_number = gst_oftvg_input_frame_number(buf);
-  gint64 output_frame_number = gst_oftvg_output_frame_number(frame_number);
-  gint64 max_frame_number = gst_oftvg_get_max_frame_number();
+  gint64 frame_number = input_frame_number(buf);
+  gint64 output_frame_number = Oftvg::output_frame_number(frame_number);
+  gint64 max_frame_number = get_max_frame_number();
 
   GstClockTime timestamp = GST_BUFFER_TIMESTAMP(buf);
 
@@ -319,7 +292,7 @@ void Oftvg::gst_oftvg_report_progress(GstBuffer* buf)
 	// Currently displayed regardless of the 'silent' attribute, because
     // setting silent=0 also prints some debug stuff.
     gint64 frames_done = output_frame_number;
-    gint64 total_frames = gst_oftvg_get_max_output_frame_number(buf);
+    gint64 total_frames = get_max_output_frame_number(buf);
     float progress =
       ((float) frames_done) * 100 / ((float) total_frames + 0.0001f);
     float timestamp_seconds = ((float) GST_BUFFER_TIMESTAMP(buf)) / GST_SECOND;
@@ -339,10 +312,10 @@ void Oftvg::gst_oftvg_report_progress(GstBuffer* buf)
 
 /* Frame number, repeat, calibration frames */
 
-GstFlowReturn Oftvg::gst_oftvg_repeat(GstBuffer* buf)
+GstFlowReturn Oftvg::repeatFromZero(GstBuffer* buf)
 {
   Oftvg* filter = this;
-  gint64 frame_number = gst_oftvg_input_frame_number(buf);
+  gint64 frame_number = input_frame_number(buf);
 
   GST_DEBUG("gstoftvg: repeat\n");
 
@@ -361,19 +334,19 @@ GstFlowReturn Oftvg::gst_oftvg_repeat(GstBuffer* buf)
   filter->timestamp_offset =
     GST_BUFFER_TIMESTAMP(buf) + GST_BUFFER_DURATION(buf);
   filter->frame_offset =
-    gst_oftvg_output_frame_number(frame_number) + 1;
+    output_frame_number(frame_number) + 1;
 
-  gst_oftvg_frame_counter_init(0);
+  frame_counter_init(0);
   return GST_FLOW_OK;
 }
 
-GstFlowReturn Oftvg::gst_oftvg_handle_frame_numbers(GstBuffer* buf)
+GstFlowReturn Oftvg::handle_frame_numbers(GstBuffer* buf)
 {
   Oftvg* filter = this;
-  gint64 frame_number = gst_oftvg_input_frame_number(buf);
-  gint64 max_frame_number = gst_oftvg_get_max_frame_number();
+  gint64 frame_number = input_frame_number(buf);
+  gint64 max_frame_number = get_max_frame_number();
   
-  gst_oftvg_report_progress(buf);
+  report_progress(buf);
 
   if (filter->repeat_count == 0 && !filter->calibration_prepend)
   {
@@ -392,7 +365,7 @@ GstFlowReturn Oftvg::gst_oftvg_handle_frame_numbers(GstBuffer* buf)
       && (frame_number + 1) % syncFrames == 0)
     {
       filter->repeat_count++;
-      return gst_oftvg_repeat(buf);
+      return repeatFromZero(buf);
     }
   }
 
@@ -400,7 +373,7 @@ GstFlowReturn Oftvg::gst_oftvg_handle_frame_numbers(GstBuffer* buf)
     && filter->repeat_count < filter->repeat)
   {
     filter->repeat_count++;
-    return gst_oftvg_repeat(buf);
+    return repeatFromZero(buf);
   }
 
   if ((frame_number > max_frame_number)
@@ -426,44 +399,13 @@ GstFlowReturn Oftvg::gst_oftvg_handle_frame_numbers(GstBuffer* buf)
     return GST_FLOW_UNEXPECTED;
   }
 
-  gst_oftvg_frame_counter_advance();
+  frame_counter_advance();
 
   return GST_FLOW_OK;
 }
 
-
-/// This function does the actual processing. In place processing.
-GstFlowReturn Oftvg::gst_oftvg_transform_ip(GstBuffer *buf)
-{
-  Oftvg *filter = this;
-
-  GST_BUFFER_TIMESTAMP(buf) += filter->timestamp_offset;
-  GstFlowReturn ret = gst_oftvg_handle_frame_numbers(buf);
-
-  if (GST_FLOW_IS_SUCCESS(ret))
-  {
-    const GstOFTVGLayout& layout = gst_oftvg_get_layout(buf);
-
-    if (layout.length() == 0)
-    {
-      // Reported elsewhere
-      return GST_FLOW_ERROR;
-    }
-
-    gint64 frame_number = gst_oftvg_input_frame_number(buf);
-
-    // Call through member function pointer.
-    (filter->*(process_inplace))
-      (GST_BUFFER_DATA(buf), (int) frame_number, layout);
-  }
-
-  return ret;
-}
-
-
-
 const GstOFTVGLayout&
-  Oftvg::gst_oftvg_get_layout(const GstBuffer* buf)
+  Oftvg::get_layout(const GstBuffer* buf)
 {
   const Oftvg* filter = this;
   // Default
@@ -486,6 +428,39 @@ const GstOFTVGLayout&
 
   return *layout;
 }
+
+
+/// In place processing. Calls the processing function to do the
+/// actual processing on the buffer.
+GstFlowReturn Oftvg::gst_oftvg_transform_ip(GstBuffer *buf)
+{
+  Oftvg *filter = this;
+
+  GST_BUFFER_TIMESTAMP(buf) += filter->timestamp_offset;
+  GstFlowReturn ret = handle_frame_numbers(buf);
+
+  if (GST_FLOW_IS_SUCCESS(ret))
+  {
+    const GstOFTVGLayout& layout = get_layout(buf);
+
+    if (layout.length() == 0)
+    {
+      // Reported elsewhere
+      return GST_FLOW_ERROR;
+    }
+
+    gint64 frame_number = input_frame_number(buf);
+
+    // Call through member function pointer.
+    (filter->*(process_inplace))
+      (GST_BUFFER_DATA(buf), (int) frame_number, layout);
+  }
+
+  return ret;
+}
+
+
+
 
 ////////
 // Utils
@@ -532,7 +507,7 @@ static int gst_oftvg_get_subsampling_v_shift(GstVideoFormat format,
 /// determined by filter->color.
 /// Note: gst_oftvg_set_process_function determines
 /// which processing function to use.
-void Oftvg::gst_oftvg_process_default(guint8 *buf, int frame_number,
+void Oftvg::process_default(guint8 *buf, int frame_number,
   const GstOFTVGLayout& layout)
 {
   Oftvg* filter = this;

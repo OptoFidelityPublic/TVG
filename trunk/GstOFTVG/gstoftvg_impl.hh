@@ -19,7 +19,7 @@
  */
 
 /**
- * Private declarations for GstOFTVG element.
+ * Implementation of the filter.
  */
 
 #ifndef __GST_OFTVG_IMPL_HH__
@@ -31,21 +31,33 @@
 
 #include "gstoftvg_layout.hh"
 
-#include "timemeasure.h"
-
 namespace OFTVG
 {
 
+/// OFTVG Filter implementation.
 class Oftvg
 {
 public:
   Oftvg();
+
+  /* Initialization */
+
+  /// Sets the element. This has to be called before other
+  /// members.
   void setElement(GstBaseTransform& element)
   {
     element_ = &element;
   }
-  bool gst_video_format_parse_caps(GstCaps* incaps);
-  bool Oftvg::gst_oftvg_init_params();
+  
+  /// Initializes the filter for the format.
+  bool videoFormatSetCaps(GstCaps* incaps);
+
+  /// Initializes parameters of the filter.
+  /// Precondition: videoFormatSetCaps has been called successfully.
+  bool Oftvg::initParams();
+
+  /// Processes one frame.
+  /// Precondition: gst_oftvg_init_params has been called succesfully.
   GstFlowReturn Oftvg::gst_oftvg_transform_ip(GstBuffer *buf);
 
   /* Properties */
@@ -64,35 +76,44 @@ public:
   void setSilent(bool value) { silent = value; }
 
   /* state */
+  /// Returns the repeat counter value. 0 = calibration frames.
+  /// 1 = first round.
   int getRepeatCount() { return repeat_count; }
-  bool outputStreamEnded();
+  /// Returns whether we are at the last frame to process from the input
+  /// stream.
+  bool atInputStreamEnd();
 
 private:
   GstBaseTransform& element() { return *element_; }
 
-  void gst_oftvg_frame_counter_init(gint64 frame_counter);
-  void Oftvg::gst_oftvg_frame_counter_advance();
-  gint64 Oftvg::gst_oftvg_output_frame_number(gint64 frame_number);
-  gint64 gst_oftvg_input_frame_number(const GstBuffer* buf);
-  gint64 gst_oftvg_get_max_frame_number();
-  gint64 Oftvg::gst_oftvg_get_max_output_frame_number(const GstBuffer* buf);
+  /// Resets the input frame counter.
+  void frame_counter_init(gint64 frame_counter);
+  /// Advances the frame counter.
+  void frame_counter_advance();
+  /// Returns the output frame number.
+  gint64 output_frame_number(gint64 frame_number);
+  /// Returns the input frame number.
+  gint64 input_frame_number(const GstBuffer* buf);
+  /// Returns the maximum input frame number.
+  gint64 get_max_frame_number();
+  /// Returns the maximum output frame number.
+  gint64 get_max_output_frame_number(const GstBuffer* buf);
 
   /* initialization */
-  void Oftvg::gst_oftvg_init();
-  bool gst_oftvg_set_process_function();
-  void Oftvg::gst_oftvg_init_colorspace();
-  void Oftvg::gst_oftvg_init_layout();
+  bool set_process_function();
+  void init_colorspace();
+  void init_layout();
 
   /// Report progress
-  void Oftvg::gst_oftvg_report_progress(GstBuffer* buf);
+  void report_progress(GstBuffer* buf);
 
-  GstFlowReturn Oftvg::gst_oftvg_repeat(GstBuffer* buf);
-  GstFlowReturn Oftvg::gst_oftvg_handle_frame_numbers(GstBuffer* buf);
+  GstFlowReturn repeatFromZero(GstBuffer* buf);
+  GstFlowReturn handle_frame_numbers(GstBuffer* buf);
 
   const GstOFTVGLayout&
-    gst_oftvg_get_layout(const GstBuffer* buf);
+    get_layout(const GstBuffer* buf);
   
-  void gst_oftvg_process_default(guint8 *buf, int frame_number,
+  void process_default(guint8 *buf, int frame_number,
     const GstOFTVGLayout& layout);
   
 private:

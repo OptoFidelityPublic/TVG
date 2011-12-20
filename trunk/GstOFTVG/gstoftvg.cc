@@ -394,7 +394,7 @@ static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event)
       }
       break;
     case GST_EVENT_EOS:
-      if (!filter->oftvg.outputStreamEnded())
+      if (!filter->oftvg.atInputStreamEnd())
       {
         GST_ELEMENT_WARNING(filter, STREAM, FAILED,
           ("Stream ended prematurely."), (NULL));
@@ -435,14 +435,14 @@ static gboolean gst_oftvg_set_caps(GstBaseTransform* object,
   /* unused parameter */ outcaps;
   GstOFTVG *filter = GST_OFTVG(object);
 
-  if (!filter->oftvg.gst_video_format_parse_caps(incaps))
+  if (!filter->oftvg.videoFormatSetCaps(incaps))
   {
-    GST_WARNING_OBJECT(filter, "Failed to parse caps %"
+    GST_WARNING_OBJECT(filter, "Failed to set caps %"
       GST_PTR_FORMAT " -> %" GST_PTR_FORMAT, incaps, outcaps);
     return FALSE;
   }
 
-  if (!filter->oftvg.gst_oftvg_init_params())
+  if (!filter->oftvg.initParams())
   {
     GST_WARNING_OBJECT(filter, "No processing function for this caps");
     return FALSE;
