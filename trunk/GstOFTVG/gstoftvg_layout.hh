@@ -44,7 +44,7 @@ namespace OFTVG
     OVERLAY_MODE_WHITE,
     OVERLAY_MODE_CALIBRATION
   };
-}
+};
 
 class GstOFTVGLayout;
 
@@ -141,6 +141,7 @@ private:
   std::vector<GstOFTVGElement> elements_;
   int frameidBits_;
 };
+
 
 
 #endif /* __GST_OFTVG_LAYOUT_HH__ */

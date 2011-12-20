@@ -72,6 +72,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="gstoftvg.cc" />
+    <ClCompile Include="gstoftvg_impl.cc" />
     <ClCompile Include="gstoftvg_layout.cc" />
     <ClCompile Include="gstoftvg_pixbuf.cc" />
   </ItemGroup>
@@ -82,6 +83,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="GstOFTVG.def" />
+    <None Include="gstoftvg_impl.hh" />
     <None Include="gstoftvg_layout.hh" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -32,6 +32,12 @@
  * </refsect2>
  */
 
+/**
+ * This file includes the interface between the filter implementation
+ * and the Gstreamer plugin API. Also timing for benchmarking purposes
+ * is implemented here.
+*/
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -42,11 +48,14 @@
 #include <gst/base/gstbasetransform.h>
 #include <gst/video/video.h>
 
+// for timemeasure.h
+#define DO_TIMING 1
+
 #include "gstoftvg.hh"
 #include "gstoftvg_pixbuf.hh"
-
-#define DO_TIMING 1
 #include "timemeasure.h"
+
+using namespace OFTVG;
 
 #if defined(_MSC_VER)
 #define Restrict __restrict
@@ -59,13 +68,12 @@ GST_DEBUG_CATEGORY_STATIC (gst_oftvg_debug);
 
 static const gchar* const DEFAULT_LAYOUT_LOCATION =
   "../layout/test-layout-1920x1080-c.bmp";
-  //"../layout/test-layout-1920x355-c.bmp";
-  //"../layout/test-layout-1920x1080-b.png";
 
 static const gchar* const CALIBRATION_OFF = "off";
 static const gchar* const CALIBRATION_ONLY = "only";
 static const gchar* const CALIBRATION_PREPEND = "prepend";
 static const gchar* const DEFAULT_CALIBRATION = CALIBRATION_OFF;
+static const bool DEFAULT_CALIBRATION_PREPEND = false;
 static const int DEFAULT_REPEAT = 1;
 static const int DEFAULT_NUM_BUFFERS = -1;
 
@@ -144,6 +152,8 @@ static void gst_oftvg_get_property (GObject * object, guint prop_id,
 static gint64 gst_oftvg_source_frame_number(GstOFTVG* const filter,
   const GstBuffer* const buf);
 
+static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event);
+
 static GstFlowReturn gst_oftvg_transform_ip (GstBaseTransform * base,
     GstBuffer * outbuf);
 
@@ -154,7 +164,16 @@ static const GstOFTVGLayout&
   gst_oftvg_get_layout(const GstOFTVG* filter, const GstBuffer* buf);
 
 static gboolean gst_oftvg_set_process_function(GstOFTVG* filter);
-static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event);
+
+/* entry point to initialize the plug-in
+ * initialize the plug-in itself
+ * register the element factories and other features
+ */
+static gboolean
+oftvg_init (GstPlugin* oftvg)
+{
+  return gst_element_register (oftvg, "oftvg", GST_RANK_NONE, GST_TYPE_OFTVG);
+}
 
 /* GObject vmethod implementations */
 
@@ -173,75 +192,6 @@ gst_oftvg_base_init (gpointer klass)
       gst_static_pad_template_get (&src_template));
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&sink_template));
-}
-
-static void gst_oftvg_frame_counter_init(GstOFTVG* filter,
-  gint64 frame_counter)
-{
-  filter->frame_counter = frame_counter;
-}
-
-static void gst_oftvg_frame_counter_advance(GstOFTVG* filter)
-{
-  filter->frame_counter++;
-}
-
-static gint64 gst_oftvg_sink_frame_number(const GstOFTVG* filter, gint64 frame_number)
-{
-  return frame_number + filter->frame_offset;
-}
-
-/// Gets the frame number
-/// @param buf The buffer. Or null if no buffer at hand.
-static gint64 gst_oftvg_source_frame_number(GstOFTVG* filter,
-  const GstBuffer* buf)
-{
-  if (buf != NULL)
-  {
-    // For video frames, buf->offset is the frame number of this buffer.
-    // By qtdemux and oggdemux offset seems to be constantly -1.
-    // Lets use our internal frame counter then.
-    if ((gint64) GST_BUFFER_OFFSET(buf) >= 0)
-    {
-      gst_oftvg_frame_counter_init(filter, GST_BUFFER_OFFSET(buf));
-    }
-  }
-  return filter->frame_counter;
-}
-
-/// Gets the maximum source frame number, or -1 if no frames
-/// should be read.
-static gint64 gst_oftvg_get_max_frame_number(const GstOFTVG* filter)
-{
-  gint64 max_frame_number = 0;
-  if (filter->num_buffers == -1)
-  {
-    max_frame_number = filter->layout.maxFrameNumber();
-  }
-  else if (filter->num_buffers >= 0)
-  {
-    max_frame_number = filter->num_buffers - 1;
-  }
-  else
-  {
-    g_assert_not_reached();
-  }
-  return max_frame_number;
-}
-
-static gint64 gst_oftvg_get_max_sink_frame_number(const GstOFTVG* filter,
-  const GstBuffer* buf)
-{
-  gint64 calibration_frames = 0;
-  if (filter->calibration_prepend)
-  {
-    // Estimation
-    calibration_frames =
-      calibrationTimestamps[numCalibrationTimestamps - 1]
-      / GST_BUFFER_DURATION(buf);
-  }
-  return calibration_frames +
-    (gst_oftvg_get_max_frame_number(filter) + 1) * filter->repeat;
 }
 
 /* initialize the oftvg's class */
@@ -292,25 +242,20 @@ gst_oftvg_init (GstOFTVG* filter, GstOFTVGClass* klass)
 {
   /* unused parameter */ klass;
 
-  filter->silent = FALSE;
-  filter->layout_location = g_strdup(DEFAULT_LAYOUT_LOCATION);
-  filter->calibration_prepend = FALSE;
-  filter->repeat = DEFAULT_REPEAT;
-  // Start with calibration frames.
-  filter->repeat_count = 0;
-  filter->num_buffers = DEFAULT_NUM_BUFFERS;
-  // use placement new, construct the object in the memory already allocated.
-  ::new (&(filter->layout)) GstOFTVGLayout();
-  filter->frame_counter = 0;
-  filter->progress_timestamp = G_MININT64;
-  filter->timestamp_offset = 0;
-  filter->frame_offset = 0;
+  // use placement new to construct the object in the memory already allocated.
+  ::new (&(filter->oftvg)) OFTVG::Oftvg();
+  filter->oftvg.setElement(filter->element);
+  filter->oftvg.setLayoutLocation(DEFAULT_LAYOUT_LOCATION);
+  filter->oftvg.setCalibrationPrepend(DEFAULT_CALIBRATION_PREPEND);
+  filter->oftvg.setRepeat(DEFAULT_REPEAT);
+  filter->oftvg.setNumBuffers(DEFAULT_NUM_BUFFERS);
 
-  if (!filter->silent)
-  {
-    GST_DEBUG("GstOFTVG initialized.\n");
-  }
+  GST_DEBUG("GstOFTVG initialized.\n");
 }
+
+/*
+Event handlers.
+*/
 
 static void
 gst_oftvg_set_property (GObject * object, guint prop_id,
@@ -324,34 +269,30 @@ gst_oftvg_set_property (GObject * object, guint prop_id,
       const gchar* str = g_value_get_string(value);
       if (g_strcasecmp(CALIBRATION_OFF, str) == 0)
       {
-        filter->calibration_prepend = FALSE;
+        filter->oftvg.setCalibrationPrepend(false);
       }
       else
       {
-        filter->calibration_prepend = TRUE;
+        filter->oftvg.setCalibrationPrepend(true);
         if (g_strcasecmp(CALIBRATION_ONLY, str) == 0)
         {
-          filter->num_buffers = 0;
-          filter->repeat = 0;
+          filter->oftvg.setNumBuffers(0);
+          filter->oftvg.setRepeat(0);
         }
       }
       break;
     }
     case PROP_LOCATION:
-      if (filter->layout_location != NULL)
-      {
-        g_free(filter->layout_location);
-      }
-      filter->layout_location = g_value_dup_string(value);
+      filter->oftvg.setLayoutLocation(g_value_get_string(value));
       break;
     case PROP_NUMBUF:
-      filter->num_buffers = g_value_get_int(value);
+      filter->oftvg.setNumBuffers(g_value_get_int(value));
       break;
     case PROP_REPEAT:
-      filter->repeat = g_value_get_int(value);
+      filter->oftvg.setRepeat(g_value_get_int(value));
       break;
     case PROP_SILENT:
-      filter->silent = g_value_get_boolean(value);
+      filter->oftvg.setSilent(g_value_get_boolean(value)?true:false);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -367,7 +308,7 @@ gst_oftvg_get_property (GObject * object, guint prop_id,
 
   switch (prop_id) {
     case PROP_CALIBRATION:
-      if (filter->calibration_prepend)
+      if (filter->oftvg.getCalibrationPrepend())
       {
         g_value_set_string(value, CALIBRATION_PREPEND);
       }
@@ -377,58 +318,21 @@ gst_oftvg_get_property (GObject * object, guint prop_id,
       }
       break;
     case PROP_LOCATION:
-      g_value_set_string(value, filter->layout_location);
+      g_value_set_string(value, filter->oftvg.getLayoutLocation());
       break;
     case PROP_NUMBUF:
-      g_value_set_int(value, filter->num_buffers);
+      g_value_set_int(value, filter->oftvg.getNumBuffers());
       break;
     case PROP_REPEAT:
-      g_value_set_int(value, filter->repeat);
+      g_value_set_int(value, filter->oftvg.getRepeat());
       break;
     case PROP_SILENT:
-      g_value_set_boolean(value, filter->silent);
+      g_value_set_boolean(value, filter->oftvg.getSilent());
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
   }
-}
-
-static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event)
-{
-  GstOFTVG* filter = GST_OFTVG(base);
-  gboolean ret;
-
-  switch (GST_EVENT_TYPE(event))
-  {
-    case GST_EVENT_FLUSH_START:
-    case GST_EVENT_FLUSH_STOP:
-    case GST_EVENT_NEWSEGMENT:
-      // Block the events related to the repeat seek from propagating downstream.
-      // We kind of split the pipeline in half: upstream seeks back to the start
-      // of video while downstream keeps going.
-      if (filter->repeat_count > 0)
-      {
-        // drop event
-        ret = FALSE;
-      }
-      break;
-    case GST_EVENT_EOS:
-      if (gst_oftvg_source_frame_number(filter, NULL)
-          < gst_oftvg_get_max_frame_number(filter))
-      {
-        GST_ELEMENT_WARNING(filter, STREAM, FAILED,
-          ("Stream ended prematurely."), (NULL));
-      }
-      // Pass on.
-      ret = TRUE;
-      break;
-    default:
-      ret = TRUE;
-      break;
-  }
-
-  return ret;
 }
 
 /* timing helpers */
@@ -439,12 +343,15 @@ static void gst_oftvg_process_ip_begin_timing(GstOFTVG* filter)
 static void gst_oftvg_process_ip_end_timing(GstOFTVG* filter,
   timemeasure_t timer1)
 {
-  if (!filter->silent)
+  // NOTE: This function does not support multiple oftvg filters
+  // to coexist. The timers and counters will be mixed.
+  if (!filter->oftvg.getSilent())
   {
     static double total_oftvg_time = 0;
     static int timer_counter = 0;
     static timemeasure_t total_pipeline_timer = 0;
     total_oftvg_time += end_timing(timer1, "gst_oftvg_transform_ip");
+
     if (timer_counter == 0)
     {
       total_pipeline_timer = timer1;
@@ -465,139 +372,42 @@ static void gst_oftvg_process_ip_end_timing(GstOFTVG* filter,
   }
 }
 
-/* Progress reporting */
-static void gst_oftvg_report_progress(GstOFTVG* filter, GstBuffer* buf)
-{
-  gint64 frame_number = gst_oftvg_source_frame_number(filter, buf);
-  gint64 sink_frame_number = gst_oftvg_sink_frame_number(filter, frame_number);
-  gint64 max_frame_number = gst_oftvg_get_max_frame_number(filter);
-
-  GstClockTime timestamp = GST_BUFFER_TIMESTAMP(buf);
-
-  if (timestamp / GST_SECOND - filter->progress_timestamp / GST_SECOND != 0)
-  {
-    filter->progress_timestamp = timestamp;
-
-	// Just show some feedback to user.
-	// Currently displayed regardless of the 'silent' attribute, because
-    // setting silent=0 also prints some debug stuff.
-    gint64 frames_done = sink_frame_number;
-    gint64 total_frames = gst_oftvg_get_max_sink_frame_number(filter, buf);
-    float progress =
-      ((float) frames_done) * 100 / ((float) total_frames + 0.0001f);
-    float timestamp_seconds = ((float) GST_BUFFER_TIMESTAMP(buf)) / GST_SECOND;
-
-    g_print("Progress: %0.1f%% (%0.1f seconds) complete\n",
-      progress, timestamp_seconds);
-  }
-
-  if (!filter->silent)
-  {
-    // DEBUG
-    //g_print("frame %d (%d / %d) [ts: %0.3f]\n", (int) frame_number,
-    //  (int) max_frame_number, filter->repeat_count,
-    //  ((double) buf->timestamp) / GST_SECOND);
-  }
-}
-
-/* Frame number, repeat, calibration frames */
-
-static GstFlowReturn gst_oftvg_repeat(GstOFTVG* filter, GstBuffer* buf)
-{
-  gint64 frame_number = gst_oftvg_source_frame_number(filter, buf);
-
-  GST_DEBUG("gstoftvg: repeat\n");
-
-  // Seek the stream
-  gint64 seek_pos = 0;
-  if (!gst_element_seek(&filter->element.element, 1.0, GST_FORMAT_TIME,
-          (GstSeekFlags) (GST_SEEK_FLAG_FLUSH|GST_SEEK_FLAG_ACCURATE),
-          GST_SEEK_TYPE_SET, seek_pos, GST_SEEK_TYPE_NONE, 0))
-  {
-    GST_ELEMENT_ERROR(filter, STREAM, FAILED, (NULL),
-      ("gstoftvg: seek"));
-    return GST_FLOW_ERROR;
-  }
-
-  // Keep the timestamps we output sequential.
-  filter->timestamp_offset =
-    GST_BUFFER_TIMESTAMP(buf) + GST_BUFFER_DURATION(buf);
-  filter->frame_offset =
-    gst_oftvg_sink_frame_number(filter, frame_number) + 1;
-
-  gst_oftvg_frame_counter_init(filter, 0);
-  return GST_FLOW_OK;
-}
-
-static GstFlowReturn gst_oftvg_handle_frame_numbers(
-  GstOFTVG* filter, GstBuffer* buf)
-{
-  gint64 frame_number = gst_oftvg_source_frame_number(filter, buf);
-  gint64 max_frame_number = gst_oftvg_get_max_frame_number(filter);
-  
-  gst_oftvg_report_progress(filter, buf);
-
-  if (filter->repeat_count == 0 && !filter->calibration_prepend)
-  {
-    // There was no calibration frames.
-    filter->repeat_count++;
-  }
-  else if (filter->repeat_count == 0)
-  {
-    // Calibration frames. No frame limit. Just time limit.
-    max_frame_number = G_MAXINT64;
-    GstClockTime ts = calibrationTimestamps[numCalibrationTimestamps-1];
-    // There are two syncmarks. So let's repeat when both syncmarks are on
-    // so there will not be a bump in the synchronization marks.
-    int syncFrames = 1 << 2;
-    if (buf->timestamp + buf->duration >= ts
-      && (frame_number + 1) % syncFrames == 0)
-    {
-      filter->repeat_count++;
-      return gst_oftvg_repeat(filter, buf);
-    }
-  }
-
-  if (frame_number >= max_frame_number
-    && filter->repeat_count < filter->repeat)
-  {
-    filter->repeat_count++;
-    return gst_oftvg_repeat(filter, buf);
-  }
-
-  if ((frame_number > max_frame_number)
-    || filter->repeat_count > filter->repeat)
-  {
-    // Enough frames have been processed.
-    if (!filter->silent)
-    {
-      g_print("gstoftvg: Enough frames have been processed: %d x %d.\n",
-        filter->repeat_count, (int) frame_number);
-    }
-    /*
-    "It is important to note that only elements driving the pipeline should ever
-    send an EOS event. If your element is chain-based, it is not driving the
-    pipeline. Chain-based elements should just return GST_FLOW_UNEXPECTED from
-    their chain function at the end of the stream (or the configured segment),
-    the upstream element that is driving the pipeline will then take care of
-    sending the EOS event (or alternatively post a SEGMENT_DONE message on the
-    bus depending on the mode of operation)."
-    http://gstreamer.freedesktop.org/data/doc/gstreamer/head/pwg/html/section-events-definitions.html
-    */
-    gst_pad_push_event(filter->element.srcpad, gst_event_new_eos());
-    return GST_FLOW_UNEXPECTED;
-  }
-
-  gst_oftvg_frame_counter_advance(filter);
-
-  return GST_FLOW_OK;
-}
-
 /* GstBaseTransform vmethod implementations */
 
-static void gst_oftvg_before_transform(GstBaseTransform* btrans,
-  GstBuffer* buffer)
+static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event)
 {
+  GstOFTVG* filter = GST_OFTVG(base);
+  gboolean ret;
+
+  switch (GST_EVENT_TYPE(event))
+  {
+    case GST_EVENT_FLUSH_START:
+    case GST_EVENT_FLUSH_STOP:
+    case GST_EVENT_NEWSEGMENT:
+      // Block the events related to the repeat seek from propagating downstream.
+      // We kind of split the pipeline in half: upstream seeks back to the start
+      // of video while downstream keeps going.
+      if (filter->oftvg.getRepeatCount() > 0)
+      {
+        // drop event
+        ret = FALSE;
+      }
+      break;
+    case GST_EVENT_EOS:
+      if (!filter->oftvg.outputStreamEnded())
+      {
+        GST_ELEMENT_WARNING(filter, STREAM, FAILED,
+          ("Stream ended prematurely."), (NULL));
+      }
+      // Pass on.
+      ret = TRUE;
+      break;
+    default:
+      ret = TRUE;
+      break;
+  }
+
+  return ret;
 }
 
 /// This function does the actual processing. In place processing.
@@ -608,113 +418,14 @@ gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
 
   GstOFTVG *filter = GST_OFTVG(base);
 
-  GST_BUFFER_TIMESTAMP(buf) += filter->timestamp_offset;
-  GstFlowReturn ret = gst_oftvg_handle_frame_numbers(filter, buf);
+  GstFlowReturn ret = filter->oftvg.gst_oftvg_transform_ip(buf);
 
   if (GST_FLOW_IS_SUCCESS(ret))
   {
-    const GstOFTVGLayout& layout = gst_oftvg_get_layout(filter, buf);
-
-    if (layout.length() == 0)
-    {
-      // Reported elsewhere
-      return GST_FLOW_ERROR;
-    }
-
-    gint64 frame_number = gst_oftvg_source_frame_number(filter, buf);
-    filter->process_inplace(GST_BUFFER_DATA(buf), filter, (int) frame_number,
-      layout);
     gst_oftvg_process_ip_end_timing(filter, timer1);
   }
 
   return ret;
-}
-
-/* entry point to initialize the plug-in
- * initialize the plug-in itself
- * register the element factories and other features
- */
-static gboolean
-oftvg_init (GstPlugin* oftvg)
-{
-  return gst_element_register (oftvg, "oftvg", GST_RANK_NONE, GST_TYPE_OFTVG);
-}
-
-static void gst_oftvg_init_colorspace(GstOFTVG* filter)
-{
-  const guint8 bit_on_color_yuv[4] = { 255, 128, 128, 0 };
-  const guint8 bit_off_color_yuv[4] = { 0, 128, 128, 0 };
-
-  const guint8 bit_on_color_rgb[4] = { 255, 255, 255, 0 };
-  const guint8 bit_off_color_rgb[4] = { 0, 0, 0, 0 };
-
-  if (!filter->silent)
-  {
-    g_print("gst_oftvg_init_params()\n");
-  }
-
-  const guint8* bit_on_color = NULL;
-  const guint8* bit_off_color = NULL;
-
-  if (gst_video_format_is_yuv(filter->in_format))
-  {
-    bit_on_color = bit_on_color_yuv;
-    bit_off_color = bit_off_color_yuv;
-  }
-  else
-  {
-    bit_on_color = bit_on_color_rgb;
-    bit_off_color = bit_off_color_rgb;
-  }
-
-  memcpy((void *) &(filter->bit_on_color[0]),
-    bit_on_color, sizeof(guint8)*4);
-  memcpy((void *) &(filter->bit_off_color[0]),
-    bit_off_color, sizeof(guint8)*4);
-}
-
-static void gst_oftvg_init_layout(GstOFTVG* filter)
-{
-  OFTVG::OverlayMode calibrationModes[2] =
-  {
-    OFTVG::OVERLAY_MODE_WHITE,
-    OFTVG::OVERLAY_MODE_CALIBRATION
-  };
-
-  const gchar* filename = filter->layout_location;
-  GError* error = NULL;
-  gboolean ret = TRUE;
-
-  filter->layout.clear();
-  filter->calibration_layouts.clear();
-
-  for (int i = 0; i < sizeof(calibrationModes)/sizeof(calibrationModes[0]); ++i)
-  {
-    GstOFTVGLayout new_layout;
-    OFTVG::OverlayMode mode = calibrationModes[i];
-    
-    filter->calibration_layouts.push_back(new_layout);    
-    GstOFTVGLayout& layout = filter->calibration_layouts.back();
-
-    ret &= gst_oftvg_load_layout_bitmap(filename, &error, &layout,
-      filter->width, filter->height, mode);
-  }
-
-  ret &= gst_oftvg_load_layout_bitmap(filename, &error, &filter->layout,
-    filter->width, filter->height, OFTVG::OVERLAY_MODE_DEFAULT);
-
-  if (!ret)
-  {
-    GST_ELEMENT_ERROR(&filter->element.element, RESOURCE, OPEN_READ,
-      ("Could not open layout file: %s. %s", filename, error->message),
-      (NULL));
-  }
-}
-
-static void gst_oftvg_init_params(GstOFTVG* filter)
-{
-  gst_oftvg_init_colorspace(filter);
-  gst_oftvg_init_layout(filter);
 }
 
 
@@ -724,163 +435,22 @@ static gboolean gst_oftvg_set_caps(GstBaseTransform* object,
   /* unused parameter */ outcaps;
   GstOFTVG *filter = GST_OFTVG(object);
 
-  if (!gst_video_format_parse_caps(incaps, &filter->in_format,
-          &filter->width, &filter->height)
-    || !gst_video_format_parse_caps(incaps, &filter->out_format,
-          &filter->width, &filter->height))
+  if (!filter->oftvg.gst_video_format_parse_caps(incaps))
   {
     GST_WARNING_OBJECT(filter, "Failed to parse caps %"
       GST_PTR_FORMAT " -> %" GST_PTR_FORMAT, incaps, outcaps);
     return FALSE;
   }
 
-  if (!gst_oftvg_set_process_function(filter))
+  if (!filter->oftvg.gst_oftvg_init_params())
   {
     GST_WARNING_OBJECT(filter, "No processing function for this caps");
     return FALSE;
   }
 
-  gst_oftvg_init_params(filter);
-
   return TRUE;
 }
 
-static int gst_oftvg_integer_log2(int val)
-{
-  int r = 0;
-  while (val >>= 1)
-  {
-    r++;
-  }
-  return r;
-}
-
-/// Gets the amount that x coordinate needs to be shifted to the right
-/// to get a matching coordinate in the component data that is possibly
-/// subsampled.
-static int gst_oftvg_get_subsampling_h_shift(GstVideoFormat format,
-  int component, int width)
-{
-  int val =
-    width / gst_video_format_get_component_width(format, component, width);
-  return gst_oftvg_integer_log2(val);
-}
-
-/// Gets the amount that y coordinate needs to be shifted to the right
-/// to get a matching coordinate in the component data that is possibly
-/// subsampled.
-static int gst_oftvg_get_subsampling_v_shift(GstVideoFormat format,
-  int component, int height)
-{
-  int val =
-    height / gst_video_format_get_component_height(format, component, height);
-  return gst_oftvg_integer_log2(val);
-}
-
-static const GstOFTVGLayout&
-  gst_oftvg_get_layout(const GstOFTVG* filter, const GstBuffer* buf)
-{
-  // Default
-  const GstOFTVGLayout* layout = &(filter->layout);
-
-  if (filter->calibration_prepend)
-  {
-    GstClockTime dest_timestamp = GST_BUFFER_TIMESTAMP(buf);
-    int i;
-    for (i = 0; i < numCalibrationTimestamps; ++i)
-    {
-      GstClockTime timestamp = calibrationTimestamps[i];
-      if (dest_timestamp < timestamp)
-      {
-        layout = &(filter->calibration_layouts[i]);
-        break;
-      }
-    }
-  }
-
-  return *layout;
-}
-
-/// Generic processing function. The color components to use are
-/// determined by filter->color.
-/// Note: gst_oftvg_set_process_function determines
-/// which processing function to use.
-void gst_oftvg_process_default(guint8 *buf, GstOFTVG* filter, int frame_number,
-  const GstOFTVGLayout& layout)
-{
-  GstVideoFormat format = filter->in_format;
-
-  const int width = filter->width;
-  const int height = filter->height;
-
-  guint8* const bufY =
-    buf + gst_video_format_get_component_offset(format, 0, width, height);
-  int y_stride  = gst_video_format_get_row_stride(format, 0, width);
-  int yoff = gst_video_format_get_pixel_stride(format, 0);
-  
-  int h_subs = gst_oftvg_get_subsampling_h_shift(format, 1, width);
-  int v_subs = gst_oftvg_get_subsampling_v_shift(format, 1, height);
-
-  guint8* const bufU =
-    buf + gst_video_format_get_component_offset(format, 1, width, height);
-  guint8* const bufV =
-    buf + gst_video_format_get_component_offset(format, 2, width, height);
-  
-  int uv_stride = gst_video_format_get_row_stride(format, 1, width);
-  int uoff = gst_video_format_get_pixel_stride(format, 1);
-  int voff = gst_video_format_get_pixel_stride(format, 2);
-
-  if (layout.length() != 0)
-  {
-    int length = layout.length();
-    for (int i = 0; i < length; ++i)
-    {
-      const GstOFTVGElement& element = layout.elements()[i];
-
-      // The components are disjoint. There they may be qualified
-      // with the restrict keyword.
-      guint8* Restrict posY = bufY + element.y() * y_stride
-        + element.x() * yoff;
-      guint8* Restrict posU = bufU + (element.y() >> v_subs) * uv_stride
-        + (element.x() >> h_subs) * uoff;
-      guint8* Restrict posV = bufV + (element.y() >> v_subs) * uv_stride
-        + (element.x() >> h_subs) * voff;
-
-      if (!element.isTransparent(frame_number))
-      {
-        gboolean bit_on = element.isBitOn(frame_number);
-        
-        const guint8* color =
-          bit_on ? filter->bit_on_color : filter->bit_off_color;
-
-        for (int dx = 0; dx < element.width(); dx++)
-        {
-          *posY = color[0];
-          posY += yoff;
-        }
-      
-        for (int dx = 0; dx < element.width(); dx += 1 << h_subs)
-        {
-          *posU = color[1];
-          *posV = color[2];
-          posU += uoff;
-          posV += voff;
-        }
-      }
-    }
-  }
-}
-
-static gboolean gst_oftvg_set_process_function(GstOFTVG* filter)
-{
-  if (gst_video_format_is_yuv(filter->in_format)
-    || gst_video_format_is_rgb(filter->in_format))
-  {
-    filter->process_inplace = gst_oftvg_process_default;
-  }
-  
-  return filter->process_inplace != NULL;
-}
 
 #ifndef PACKAGE
 #define PACKAGE "gstoftvg"

@@ -31,6 +31,7 @@
 #include <gst/video/video.h>
 #include <gst/base/gstbasetransform.h>
 
+#include "gstoftvg_impl.hh"
 #include "gstoftvg_layout.hh"
 
 G_BEGIN_DECLS
@@ -51,51 +52,7 @@ typedef struct _GstOFTVGClass GstOFTVGClass;
 
 struct _GstOFTVG {
   GstBaseTransform element;
-
-  /* caps */
-  GstVideoFormat in_format;
-  GstVideoFormat out_format;
-  int width;
-  int height;
-
-  /* internal state */
-  
-  /// Which round is it? 0 = calibration frames, 1 = first round, ...
-  int repeat_count;
-  /// Number of frames to process. If -1, the number is determined by
-  /// the layout.
-  int num_buffers;
-
-  std::vector<GstOFTVGLayout> calibration_layouts;
-  GstOFTVGLayout layout;
-
-  /// Plugin's internal frame counter.
-  gint64 frame_counter;
-
-  /// Previously reported timestamp
-  GstClockTime progress_timestamp;
-
-  /// Timestamp offset for repeating frames
-  GstClockTime timestamp_offset;
-  
-  /// Frame count offset
-  gint64 frame_offset;
-
-  /* properties */
-  gboolean silent;
-  gchar* layout_location;
-  /// Produce calibration frames in the beginning
-  gboolean calibration_prepend;
-  /// Repeat first x frames n times.
-  int repeat;
-
-  /* processing function */
-  void (*process_inplace)(guint8 *buf, GstOFTVG *filter, int frame_number,
-    const GstOFTVGLayout& layout);
-
-  /* precalculated values */
-  guint8 bit_off_color[4];
-  guint8 bit_on_color[4];
+  OFTVG::Oftvg oftvg;
 };
 
 struct _GstOFTVGClass {
