@@ -81,7 +81,7 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
         // Sync mark
         int frameid_n = i + 1;
         gboolean isSyncMark = true;
-        if (overlay_mode == OFTVG::OVERLAY_MODE_WHITE)
+        if (overlay_mode == OFTVG::OVERLAY_MODE_WHITE || overlay_mode == OFTVG::OVERLAY_MODE_CALIBRATION)
         {
           // No marks.
         }
