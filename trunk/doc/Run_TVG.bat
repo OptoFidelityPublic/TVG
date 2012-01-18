@@ -14,6 +14,8 @@ SET OUTPUT=output.mov
 :: Video compression (select one)
 :: You can get configuration parameters for each format in the manual or
 :: by running e.g. gst-inspect x264enc
+:: - video/x-raw-yuv     Uncompressed video (YUV)
+:: - video/x-raw-rgb     Uncompressed video (RGB)
 :: - x264enc             H.264 video
 :: - ffenc_mjpeg         Motion-JPEG video
 :: - ffenc_mpeg4         MPEG-4 part 2
@@ -53,17 +55,23 @@ SET REPEAT=5
 :: - prepend  Put the calibration sequence before the actual video
 SET CALIBRATION=prepend
 
-@echo "Starting test video generator.."
+@echo Starting test video generator..
 
 :: Path of the software components
 SET PATH=bin\;%PATH%
 SET GST_PLUGIN_PATH=lib\gstreamer-0.10;.
 
+:: Store debug info in case something goes wrong
+del debug\*.dot debug\*.txt debug\*.png
+set GST_DEBUG_DUMP_DOT_DIR=debug
+set GST_DEBUG_FILE=debug\log.txt
+set GST_DEBUG=*:3
+
 :: Actual command that executes gst-launch
 gst-launch -q --gst-plugin-load=GstOFTVG.dll ^
-	filesrc location=%INPUT% ! decodebin2 %PREPROCESS% ! queue ^
+	filesrc location=%INPUT% ! decodebin2 name=decode %PREPROCESS% ! queue ^
 	! oftvg location=%LAYOUT% num-buffers=%NUM_BUFFERS% repeat=%REPEAT% calibration=%CALIBRATION% silent=1 ^
 	! queue ! ffmpegcolorspace ! %COMPRESSION% ! %CONTAINER% ! filesink location=%OUTPUT%
 
-@echo "Done! Press enter to exit."
+@echo Done! Press enter to exit.
 PAUSE
