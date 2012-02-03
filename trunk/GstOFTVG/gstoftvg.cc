@@ -392,6 +392,15 @@ static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event)
         // drop event
         ret = FALSE;
       }
+      else if (GST_EVENT_TYPE(event) == GST_EVENT_NEWSEGMENT)
+      {
+        // Patch other NEWSEGMENT events so that the end time is indeterminate.
+        // The default value is the length of the input video, but due to repeats
+        // our output may be longer.
+        event = gst_event_new_new_segment(false, 1.0, GST_FORMAT_TIME, 0, -1, 0);
+        gst_pad_push_event (filter->element.srcpad, event);
+        ret = FALSE;
+      }
       break;
     case GST_EVENT_EOS:
       if (!filter->oftvg.atInputStreamEnd())
