@@ -36,6 +36,7 @@ SET CONTAINER=qtmux
 
 :: Preprocessing (select one or comment all lines to disable)
 :: - videoscale ! video/x-raw-yuv,width=XXX,height=XXX                               Resize the video
+:: - videoscale ! video/x-raw-yuv,width=XXX,height=XXX,pixel-aspect-ratio=1/1        Resize the video and stretch aspect ratio
 :: - videorate ! video/x-raw-yuv,framerate=XXX/1                                     Lower FPS by dropping frames
 :: - videorate ! videoscale ! video/x-raw-yuv,framerate=XXX/1,width=XXX,height=XXX   Combination of the two
 ::SET PREPROCESS=! videoscale ! video/x-raw-yuv,width=640,height=480
