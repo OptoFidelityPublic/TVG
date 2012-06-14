@@ -1,3 +1,0 @@
-LIBRARY   GstOFTVG
-EXPORTS
-    gst_plugin_desc   @1
