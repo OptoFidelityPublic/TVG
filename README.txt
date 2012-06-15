@@ -10,7 +10,7 @@ Compiling:
 http://code.google.com/p/ossbuild-vs2010/downloads/list
 
 2. Extract those .zips under the TVG directory, so you should get directories
-called 'gstreamer-gpl' and 'gstreamer-sdk' there.
+called 'gstreamer-gpl' and 'gstreamer-sdk' there, with files directly under them.
 
 3. Open GstOFTVG/GstOFTVG.sln in Visual Studio 2010 and build it in Release mode.
 
