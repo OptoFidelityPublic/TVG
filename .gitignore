@@ -1,0 +1,8 @@
+GstOFTVG/Debug
+GstOFTVG/Release
+distribution/tvg-*
+/gstreamer-gpl
+/gstreamer-sdk
+GstOFTVG/*.sdf
+GstOFTVG/*.user
+GstOFTVG/*.opensdf

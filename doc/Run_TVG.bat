@@ -56,23 +56,31 @@ SET REPEAT=5
 :: - prepend  Put the calibration sequence before the actual video
 SET CALIBRATION=prepend
 
+:: You can put just the settings you want to change in a file named something.tvg
+:: and open it with Run_TVG.bat as the program.
+if exist "%1" (
+	copy "%1" tmp.bat >NUL
+	call tmp.bat
+	del tmp.bat
+	@echo Loaded parameters from %1
+)
+
 @echo Starting test video generator..
 
-:: Path of the software components
-SET PATH=bin\;%PATH%
-SET GST_PLUGIN_PATH=lib\gstreamer-0.10;.
+call %~dp0gstreamer\env.bat
 
 :: Store debug info in case something goes wrong
-del debug\*.dot debug\*.txt debug\*.png
-set GST_DEBUG_DUMP_DOT_DIR=debug
-set GST_DEBUG_FILE=debug\log.txt
+set DEBUGDIR=%~dp0debug
+del %DEBUGDIR%\*.dot %DEBUGDIR%\*.txt %DEBUGDIR%\*.png 2>NUL
+set GST_DEBUG_DUMP_DOT_DIR=%DEBUGDIR%
+set GST_DEBUG_FILE=%DEBUGDIR%\log.txt
 set GST_DEBUG=*:3
 
 :: Actual command that executes gst-launch
 gst-launch -q --gst-plugin-load=GstOFTVG.dll ^
 	filesrc location=%INPUT% ! decodebin2 name=decode %PREPROCESS% ! queue ^
 	! oftvg location=%LAYOUT% num-buffers=%NUM_BUFFERS% repeat=%REPEAT% calibration=%CALIBRATION% silent=1 ^
-	! queue ! ffmpegcolorspace ! %COMPRESSION% ! %CONTAINER% ! filesink location=%OUTPUT%
+	! queue ! colorspace ! %COMPRESSION% ! %CONTAINER% ! filesink location=%OUTPUT%
 
 @echo Done! Press enter to exit.
 PAUSE

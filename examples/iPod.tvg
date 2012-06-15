@@ -1,0 +1,5 @@
+SET LAYOUT=layout_vertical.bmp
+SET OUTPUT=output-ipod.mp4
+SET COMPRESSION=x264enc profile=baseline
+SET CONTAINER=mp4mux
+SET PREPROCESS=! videoscale ! video/x-raw-yuv,width=320,height=240,pixel-aspect-ratio=9/8

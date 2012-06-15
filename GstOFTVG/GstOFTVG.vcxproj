@@ -41,14 +41,14 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>Libraries\gst-include;Libraries\gst-include\glib-2.0;Libraries\gst-include\gstreamer-0.10;Libraries\gst-include\libxml2;Libraries\gst-include\gtk-2.0;Libraries\gst-include\gdk-pixbuf-2.0;Libraries\gst-include\pango-1.0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\gstreamer-sdk\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>GST_DISABLE_GST_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Libraries\gst-lib\gstreamer-0.10.lib;Libraries\gst-lib\glib-2.0.lib;Libraries\gst-lib\gobject-2.0.lib;Libraries\gst-lib\gstbase-0.10.lib;Libraries\gst-lib\gstvideo-0.10.lib;gdk_pixbuf-2.0.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>gstbase-0.10.lib;gstreamer-0.10.lib;glib-2.0.lib;gobject-2.0.lib;gstvideo-0.10.lib;gdk_pixbuf-2.0.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ModuleDefinitionFile>GstOFTVG.def</ModuleDefinitionFile>
-      <AdditionalLibraryDirectories>Libraries/gst-lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\gstreamer-sdk\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -57,7 +57,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>Libraries\gst-include;Libraries\gst-include\glib-2.0;Libraries\gst-include\gstreamer-0.10;Libraries\gst-include\libxml2;Libraries\gst-include\gtk-2.0;Libraries\gst-include\gdk-pixbuf-2.0;Libraries\gst-include\pango-1.0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\gstreamer-sdk\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>GST_DISABLE_GST_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <OmitFramePointers>true</OmitFramePointers>
     </ClCompile>
@@ -65,8 +65,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>Libraries\gst-lib\gstreamer-0.10.lib;Libraries\gst-lib\glib-2.0.lib;Libraries\gst-lib\gobject-2.0.lib;Libraries\gst-lib\gstbase-0.10.lib;Libraries\gst-lib\gstvideo-0.10.lib;gdk_pixbuf-2.0.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>Libraries/gst-lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>gstbase-0.10.lib;gstreamer-0.10.lib;glib-2.0.lib;gobject-2.0.lib;gstvideo-0.10.lib;gdk_pixbuf-2.0.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\gstreamer-sdk\lib</AdditionalLibraryDirectories>
       <ModuleDefinitionFile>GstOFTVG.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
