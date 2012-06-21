@@ -186,9 +186,12 @@ gint64 Oftvg::get_max_output_frame_number(const GstBuffer* buf)
   if (filter->calibration_prepend)
   {
     // Estimation
-    calibration_frames =
-      calibrationTimestamps[numCalibrationTimestamps - 1]
-      / GST_BUFFER_DURATION(buf);
+    if (GST_BUFFER_DURATION(buf))
+      calibration_frames =
+        calibrationTimestamps[numCalibrationTimestamps - 1]
+        / GST_BUFFER_DURATION(buf);
+    else
+      calibration_frames = 100; // Variable FPS, just make a guess (only messes up the percent readings).
   }
   return calibration_frames +
     (get_max_frame_number() + 1) * filter->repeat;
