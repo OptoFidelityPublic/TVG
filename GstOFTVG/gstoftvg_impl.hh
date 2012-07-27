@@ -42,6 +42,8 @@ public:
 
   /* Initialization */
 
+  void reset();
+
   /// Sets the element. This has to be called before other
   /// members.
   void setElement(GstBaseTransform& element)

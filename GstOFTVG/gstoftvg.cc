@@ -165,6 +165,8 @@ static const GstOFTVGLayout&
 
 static gboolean gst_oftvg_set_process_function(GstOFTVG* filter);
 
+static gboolean gst_oftvg_start(GstBaseTransform* btrans);
+
 /* entry point to initialize the plug-in
  * initialize the plug-in itself
  * register the element factories and other features
@@ -232,6 +234,7 @@ gst_oftvg_class_init (GstOFTVGClass* klass)
   btrans->event = GST_DEBUG_FUNCPTR(gst_oftvg_event);
   btrans->transform_ip = GST_DEBUG_FUNCPTR(gst_oftvg_transform_ip);
   btrans->set_caps     = GST_DEBUG_FUNCPTR(gst_oftvg_set_caps);
+  btrans->start = GST_DEBUG_FUNCPTR(gst_oftvg_start);
 }
 
 /* initialize the new element
@@ -251,6 +254,14 @@ gst_oftvg_init (GstOFTVG* filter, GstOFTVGClass* klass)
   filter->oftvg.setNumBuffers(DEFAULT_NUM_BUFFERS);
 
   GST_DEBUG("GstOFTVG initialized.\n");
+}
+
+
+static gboolean gst_oftvg_start(GstBaseTransform* btrans)
+{
+  GstOFTVG* filter = (GstOFTVG*)btrans;
+  filter->oftvg.reset();
+  return true;
 }
 
 /*

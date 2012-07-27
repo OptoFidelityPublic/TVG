@@ -84,9 +84,15 @@ Oftvg::Oftvg()
   filter->layout_location = NULL;
   filter->calibration_prepend = false;
   filter->repeat = 1;
-  // Start with calibration frames (repeat_count = 0).
-  filter->repeat_count = 0;
   filter->num_buffers = -1;
+  reset();
+}
+
+void Oftvg::reset()
+{
+  // Start with calibration frames (repeat_count = 0).
+  Oftvg* filter = this;
+  filter->repeat_count = 0;
   filter->frame_counter = 0;
   filter->progress_timestamp = G_MININT64;
   filter->timestamp_offset = 0;
