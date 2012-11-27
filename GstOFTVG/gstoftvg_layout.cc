@@ -28,72 +28,93 @@
 #include "config.h"
 #endif
 
+#include <memory>
 #include "gstoftvg_layout.hh"
 
-GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
-    gboolean isSyncMark, int offset, int period, int duty)
-: x_(x), y_(y), width_(width), height_(height),
-    isSyncMark_(isSyncMark), offset_(offset), period_(period), duty_(duty)
+GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height)
+: x_(x), y_(y), width_(width), height_(height)
 {
 }
 
-GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
-    gboolean isSyncMark, int frameid_n)
-: x_(x), y_(y), width_(width), height_(height),
-    isSyncMark_(isSyncMark),
-    offset_(0), period_(1 << frameid_n), duty_(1 << (frameid_n - 1))
+/* Frame ID marks */
+GstOFTVGElement_FrameID::GstOFTVGElement_FrameID(int x, int y, int width, int height, int frameid_n):
+  GstOFTVGElement(x, y, width, height), frameid_(frameid_n)
 {
-  if (frameid_n == 0)
+
+}
+
+OFTVG::MarkColor GstOFTVGElement_FrameID::getColor(int frameNumber) const
+{
+  if (frameNumber & (1 << (frameid_ - 1)))
+    return OFTVG::MARKCOLOR_WHITE;
+  else
+    return OFTVG::MARKCOLOR_BLACK;
+}
+
+bool GstOFTVGElement_FrameID::propertiesEqual(const GstOFTVGElement &b) const
+{
+  const GstOFTVGElement_FrameID *other = dynamic_cast<const GstOFTVGElement_FrameID*>(&b);
+  return (other != nullptr && frameid_ == other->frameid_);
+}
+
+/* Sync marks */
+GstOFTVGElement_SyncMark::GstOFTVGElement_SyncMark(int x, int y, int width, int height, int syncidx):
+  GstOFTVGElement(x, y, width, height), syncidx_(syncidx)
+{
+
+}
+
+OFTVG::MarkColor GstOFTVGElement_SyncMark::getColor(int frameNumber) const
+{
+  if (syncidx_ == 1)
   {
-    duty_ = 1;
+    if (frameNumber & 1)
+      return OFTVG::MARKCOLOR_WHITE;
+    else
+      return OFTVG::MARKCOLOR_BLACK;
+  }
+  else if (syncidx_ == 2)
+  {
+    if (frameNumber & 2)
+      return OFTVG::MARKCOLOR_WHITE;
+    else
+      return OFTVG::MARKCOLOR_BLACK;
+  }
+  else
+  {
+    return OFTVG::MARKCOLOR_TRANSPARENT; // Unknown
   }
 }
 
-/// Returns whether the properties apart from location and
-/// size equal to element b.
-gboolean GstOFTVGElement::propertiesEqual(const GstOFTVGElement& b) const
+bool GstOFTVGElement_SyncMark::propertiesEqual(const GstOFTVGElement &b) const
 {
-  const GstOFTVGElement& a = *this;
-  return a.offset_ == b.offset_ && a.period_ == b.period_ && a.duty_ == b.duty_
-    && a.isSyncMark_ == b.isSyncMark_;
+  const GstOFTVGElement_SyncMark *other = dynamic_cast<const GstOFTVGElement_SyncMark*>(&b);
+  return (other != nullptr && syncidx_ == other->syncidx_);
 }
+
+/* Background for calibration */
+GstOFTVGElement_Constant::GstOFTVGElement_Constant(int x, int y, int width, int height, OFTVG::MarkColor color):
+  GstOFTVGElement(x, y, width, height), color_(color)
+{
+
+}
+
+OFTVG::MarkColor GstOFTVGElement_Constant::getColor(int frameNumber) const
+{
+  return color_;
+}
+
+bool GstOFTVGElement_Constant::propertiesEqual(const GstOFTVGElement &b) const
+{
+  const GstOFTVGElement_Constant *other = dynamic_cast<const GstOFTVGElement_Constant*>(&b);
+  return (other != nullptr && color_ == other->color_);
+}
+
+/* GstOFTVGLayout class */
 
 GstOFTVGLayout::GstOFTVGLayout()
-   : elements_(), frameidBits_(0)
+   : elements_()
 {
-}
-
-/// Adds a pixel to the layout.
-/// @param x X coordinate.
-/// @param y Y coordinate.
-/// @param frameid_n Frame ID number. 1 == the lowest bit of the frame number.
-void GstOFTVGLayout::addPixel(int x, int y, int frameid_n, gboolean isSyncMark)
-{
-  int width = 1;
-  int height = 1;
-  GstOFTVGElement element(x, y, width, height, isSyncMark, frameid_n);
-
-  if (length() > 0)
-  {
-    GstOFTVGElement& prev = last();
-
-    if (prev.y() == y && x >= prev.x() && x < prev.x() + prev.width())
-    {
-      // There is a pixel here already.
-      return;
-    }
-    else if (prev.y() == y && prev.x() == x - prev.width()
-      && prev.propertiesEqual(element))
-    {
-      // Combine with previous element. Assume we are adding pixels from
-      // left to right.
-      last().width_ += element.width();
-      return;
-    }
-  }
-  // Create new element.
-  addElement(element);
-  frameidBits_ |= (1 << (frameid_n - 1));
 }
 
 void GstOFTVGLayout::clear()
@@ -101,52 +122,55 @@ void GstOFTVGLayout::clear()
   if (elements_.size() > 0)
   {
     elements_.clear();
-    frameidBits_ = 0;
   }
 }
 
 void GstOFTVGLayout::addElement(const GstOFTVGElement& element)
 {
-  // For simplicity only elements of height 1 are currently
-  // implemented for rendering.
-
-  if (element.height() == 1)
+  if (element.height() != 1)
   {
-    // Copy element
-    elements_.push_back(element);
-  }
-  else
-  {
+    // For simplicity only elements of height 1 are currently
+    // implemented for rendering.
     // Lets break it down to one pixel high elements.
     for (int y = element.y(); y < element.y() + element.height(); ++y)
     {
       // Copy element
-      GstOFTVGElement rowElement(element);
-      rowElement.height_ = 1;
-      rowElement.y_ = y;
-      
-      addElement(rowElement);
+      std::shared_ptr<GstOFTVGElement> rowElement(element.copy());
+      rowElement->height_ = 1;
+      rowElement->y_ = y;
+      addElement(*rowElement);
     }
   }
-}
 
-int GstOFTVGLayout::length() const
-{
-  return elements_.size();
-}
-
-const GstOFTVGElement* GstOFTVGLayout::elements() const
-{
-  return &elements_[0];
+  // Combine adjancent single-pixel elements
+  else if (element.width_ == 1 && element.height_ == 1
+      && elements_.size() > 0
+      && element.propertiesEqual(*elements_.back())
+      && element.x_ == elements_.back()->x_ + 1
+      && element.y_ == elements_.back()->y_)
+  {
+    elements_.back()->width_++;
+  }
+  
+  // Otherwise, add as a new element
+  else
+  {
+    elements_.push_back(std::shared_ptr<GstOFTVGElement>(element.copy()));
+  }
 }
 
 int GstOFTVGLayout::maxFrameNumber() const
 {
-  return frameidBits_;
-}
+  int maxid = 0;
+  for (int i = 0; i < size(); i++)
+  {
+    const GstOFTVGElement_FrameID *frameid = dynamic_cast<const GstOFTVGElement_FrameID*>(at(i));
+    if (frameid != nullptr)
+    {
+      if (frameid->getFrameId() > maxid)
+        maxid = frameid->getFrameId();
+    }
+  }
 
-GstOFTVGElement& GstOFTVGLayout::last()
-{
-  g_assert(length() > 0);
-  return elements_[length() - 1];
+  return 1 << maxid;
 }

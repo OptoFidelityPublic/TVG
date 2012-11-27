@@ -452,7 +452,7 @@ GstFlowReturn Oftvg::gst_oftvg_transform_ip(GstBuffer *buf)
   {
     const GstOFTVGLayout& layout = get_layout(buf);
 
-    if (layout.length() == 0)
+    if (layout.size() == 0)
     {
       // Reported elsewhere
       return GST_FLOW_ERROR;
@@ -542,12 +542,12 @@ void Oftvg::process_default(guint8 *buf, int frame_number,
   int uoff = gst_video_format_get_pixel_stride(format, 1);
   int voff = gst_video_format_get_pixel_stride(format, 2);
 
-  if (layout.length() != 0)
+  if (layout.size() != 0)
   {
-    int length = layout.length();
+    int length = layout.size();
     for (int i = 0; i < length; ++i)
     {
-      const GstOFTVGElement& element = layout.elements()[i];
+      const GstOFTVGElement& element = *layout.at(i);
 
       // The components are disjoint. There they may be qualified
       // with the restrict keyword.
@@ -558,12 +558,11 @@ void Oftvg::process_default(guint8 *buf, int frame_number,
       guint8* Restrict posV = bufV + (element.y() >> v_subs) * uv_stride
         + (element.x() >> h_subs) * voff;
 
-      if (!element.isTransparent(frame_number))
+      OFTVG::MarkColor markcolor = element.getColor(frame_number);
+      if (markcolor != OFTVG::MARKCOLOR_TRANSPARENT)
       {
-        gboolean bit_on = element.isBitOn(frame_number);
-        
         const guint8* color =
-          bit_on ? filter->bit_on_color : filter->bit_off_color;
+          (markcolor == OFTVG::MARKCOLOR_WHITE) ? filter->bit_on_color : filter->bit_off_color;
 
         for (int dx = 0; dx < element.width(); dx++)
         {

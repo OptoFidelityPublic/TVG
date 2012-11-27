@@ -54,19 +54,20 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
     {
       // Frame id mark
       int frameid_n = val / 10;
-      gboolean isSyncMark = false;
       if (overlay_mode == OFTVG::OVERLAY_MODE_WHITE)
       {
         // No marks.
       }
       else if (overlay_mode == OFTVG::OVERLAY_MODE_CALIBRATION)
       {
-        // Paused frame id marks
-        layout->addPixel(x, y, 0, isSyncMark);
+        // Black frame id marks
+        GstOFTVGElement_Constant element(x, y, 1, 1, OFTVG::MARKCOLOR_BLACK);
+        layout->addElement(element);
       }
       else
       {
-        layout->addPixel(x, y, frameid_n, isSyncMark);
+        GstOFTVGElement_FrameID element(x, y, 1, 1, frameid_n);
+        layout->addElement(element);
       }
     }
   }
@@ -75,19 +76,19 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
     // Check if it's a syncmark.
     for (int i = 0; i < numSyncMarks; ++i)
     {
-      if (red == syncMarks[i][0] && green == syncMarks[i][1]
-      && blue == syncMarks[i][2])
+      if (red == syncMarks[i][0] && green == syncMarks[i][1] && blue == syncMarks[i][2])
       {
         // Sync mark
         int frameid_n = i + 1;
         gboolean isSyncMark = true;
         if (overlay_mode == OFTVG::OVERLAY_MODE_WHITE || overlay_mode == OFTVG::OVERLAY_MODE_CALIBRATION)
         {
-          // No marks.
+          // Sync marks are not visible in the calibration image.
         }
         else
         {
-          layout->addPixel(x, y, frameid_n, isSyncMark);
+          GstOFTVGElement_SyncMark element(x, y, 1, 1, i + 1);
+          layout->addElement(element);
         }
       }
     }
@@ -98,11 +99,7 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
 static void gst_oftvg_init_calibration_layout_bg(GstOFTVGLayout* layout,
   int width, int height)
 {
-  int x = 0;
-  int y = 0;
-  bool isSyncMark = false;
-  int frame_id = 0;
-  GstOFTVGElement element(x, y, width, height, isSyncMark, 0, 1, 0);
+  GstOFTVGElement_Constant element(0, 0, width, height, OFTVG::MARKCOLOR_WHITE);
   layout->addElement(element);
 }
 

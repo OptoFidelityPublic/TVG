@@ -34,6 +34,7 @@
 #define __GSTOFTVG_LAYOUT_HH__
 
 #include <vector>
+#include <memory>
 #include <glib.h>
 
 namespace OFTVG
@@ -43,6 +44,19 @@ namespace OFTVG
     OVERLAY_MODE_DEFAULT,
     OVERLAY_MODE_WHITE,
     OVERLAY_MODE_CALIBRATION
+  };
+
+  enum MarkColor
+  {
+    MARKCOLOR_BLACK,
+    MARKCOLOR_RED,
+    MARKCOLOR_GREEN,
+    MARKCOLOR_YELLOW,
+    MARKCOLOR_BLUE,
+    MARKCOLOR_PURPLE,
+    MARKCOLOR_CYAN,
+    MARKCOLOR_WHITE,
+    MARKCOLOR_TRANSPARENT
   };
 };
 
@@ -54,52 +68,70 @@ class GstOFTVGLayout;
 class GstOFTVGElement
 {
 public:
-  
-  GstOFTVGElement(int x, int y, int width, int height,
-    gboolean isSyncMark, int offset, int period, int duty);
-
-  GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height,
-    gboolean isSyncMark, int frameid_n);
-
-  // Implicit copy constructor works.
+  GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height);
 
   inline const int& x() const { return x_; }
   inline const int& y() const { return y_; }
   inline const int& width() const { return width_; }
   inline const int& height() const { return height_; }
 
-  /// Returns whether the element should not be rendered.
-  inline gboolean isTransparent(int frameNumber) const
-  {
-    return FALSE;
-  }
-
-  /// Returns whether bit should be rendered as white (true) or
-  /// black (false).
-  inline gboolean isBitOn(int frameNumber) const
-  {
-      return ((frameNumber + (period_ - offset_)) % period_) >= duty_;
-  }
+  /// Get the color of this marker in the given frame
+  virtual OFTVG::MarkColor getColor(int frameNumber) const = 0;
 
   /// Returns whether the properties apart from location and
   /// size equal to element b.
-  gboolean propertiesEqual(const GstOFTVGElement& b) const;
+  virtual bool propertiesEqual(const GstOFTVGElement &b) const = 0;
+
+  /// Identical copy of this element
+  virtual inline GstOFTVGElement *copy() const = 0;
+
 private:
   int x_;
   int y_;
   int width_;
   int height_;
 
-  int offset_;
-  int period_;
-  int duty_;
-
-  /// Whether this element is sync id element which will not be paused.
-  gboolean isSyncMark_;
-  /// Whether this element is shown only in pause mode.
-  gboolean isPauseMark_;
-
   friend class GstOFTVGLayout;
+};
+
+/* Subclass for frame id marks */
+class GstOFTVGElement_FrameID: public GstOFTVGElement
+{
+public:
+  GstOFTVGElement_FrameID(int x, int y, int width, int height, int frameid_n);
+  virtual OFTVG::MarkColor getColor(int frameNumber) const;
+  virtual bool propertiesEqual(const GstOFTVGElement &b) const;
+  virtual inline GstOFTVGElement *copy() const { return new GstOFTVGElement_FrameID(*this); }
+  
+  inline int getFrameId() const { return frameid_; }
+private:
+  int frameid_;
+};
+
+/* Subclass for sync marks */
+class GstOFTVGElement_SyncMark: public GstOFTVGElement
+{
+public:
+  GstOFTVGElement_SyncMark(int x, int y, int width, int height, int syncidx);
+  virtual OFTVG::MarkColor getColor(int frameNumber) const;
+  virtual bool propertiesEqual(const GstOFTVGElement &b) const;
+  virtual inline GstOFTVGElement *copy() const { return new GstOFTVGElement_SyncMark(*this); }
+  
+private:
+  int syncidx_;
+};
+
+/* Subclass for calibration background */
+class GstOFTVGElement_Constant: public GstOFTVGElement
+{
+public:
+  GstOFTVGElement_Constant(int x, int y, int width, int height, OFTVG::MarkColor color);
+  virtual OFTVG::MarkColor getColor(int frameNumber) const;
+  virtual bool propertiesEqual(const GstOFTVGElement &b) const;
+  virtual inline GstOFTVGElement *copy() const { return new GstOFTVGElement_Constant(*this); }
+
+private:
+  OFTVG::MarkColor color_;
 };
 
 /**
@@ -118,28 +150,19 @@ public:
   /// Adds an element to the layout.
   void addElement(const GstOFTVGElement& element);
   
-  /// Adds a pixel to the layout.
-  void addPixel(int x, int y, int frameid_n, gboolean isSyncMark);
-  
   /// Returns the number of elements.
-  int length() const;
+  inline int size() const {return elements_.size();}
 
-  /// Returns the list of elements.
-  /// @param mode The mode for rendering.
-  const GstOFTVGElement* elements() const;
+  /// Returns the element at position
+  inline const GstOFTVGElement* at(int idx) const
+  { return elements_.at(idx).get(); }
   
   /// Returns the number the highest frame number that can be
   /// represented by the frame id marks in the layout.
   int maxFrameNumber() const;
 
-protected:
-  /// Gets last element.
-  /// Precondition: length() > 0.
-  GstOFTVGElement& last();
-
 private:
-  std::vector<GstOFTVGElement> elements_;
-  int frameidBits_;
+  std::vector<std::shared_ptr<GstOFTVGElement>> elements_;
 };
 
 
