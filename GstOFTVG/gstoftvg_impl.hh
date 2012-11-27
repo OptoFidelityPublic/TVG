@@ -165,8 +165,7 @@ private:
   ProcessInplaceFunc process_inplace;
 
   /* precalculated values */
-  guint8 bit_off_color[4];
-  guint8 bit_on_color[4];
+  guint8 (*color_array_)[4];
 };
 
 }; // namespace OFTVG

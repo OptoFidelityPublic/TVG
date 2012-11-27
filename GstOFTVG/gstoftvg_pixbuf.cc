@@ -41,10 +41,11 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
   int x, int y,
   int red, int green, int blue)
 {
-  const int numSyncMarks = 2;
+  const int numSyncMarks = 3;
   const int syncMarks[numSyncMarks][3] = {
-    { 255, 0, 0},
-    { 0, 255, 0}
+    { 255, 0,   0},
+    { 0, 255,   0},
+    { 0,   0, 255}
   };
 
   if (red == green && green == blue)

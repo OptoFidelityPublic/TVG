@@ -215,33 +215,40 @@ bool Oftvg::set_process_function()
   return filter->process_inplace != NULL;
 }
 
+static guint8 color_array_yuv[20][4] = {
+  {   0, 128, 128, 0},
+  { 128,  64, 255, 0},
+  { 128,   0,   0, 0},
+  { 255,   0, 128, 0},
+  {  64, 255,   0, 0},
+  { 128, 255, 255, 0},
+  { 255, 255,   0, 0},
+  { 255, 128, 128, 0}
+};
+
+static guint8 color_array_rgb[20][4] = {
+  {   0,   0,   0, 0},
+  { 255,   0,   0, 0},
+  {   0, 255,   0, 0},
+  { 255, 255,   0, 0},
+  {   0,   0, 255, 0},
+  { 255,   0, 255, 0},
+  {   0, 255, 255, 0},
+  { 255, 255, 255, 0}
+};
+
 void Oftvg::init_colorspace()
 {
   Oftvg* filter = this;
-  const guint8 bit_on_color_yuv[4] = { 255, 128, 128, 0 };
-  const guint8 bit_off_color_yuv[4] = { 0, 128, 128, 0 };
-
-  const guint8 bit_on_color_rgb[4] = { 255, 255, 255, 0 };
-  const guint8 bit_off_color_rgb[4] = { 0, 0, 0, 0 };
-
-  const guint8* bit_on_color = NULL;
-  const guint8* bit_off_color = NULL;
 
   if (gst_video_format_is_yuv(filter->in_format))
   {
-    bit_on_color = bit_on_color_yuv;
-    bit_off_color = bit_off_color_yuv;
+    color_array_ = color_array_yuv;
   }
   else
   {
-    bit_on_color = bit_on_color_rgb;
-    bit_off_color = bit_off_color_rgb;
+    color_array_ = color_array_rgb;
   }
-
-  memcpy((void *) &(filter->bit_on_color[0]),
-    bit_on_color, sizeof(guint8)*4);
-  memcpy((void *) &(filter->bit_off_color[0]),
-    bit_off_color, sizeof(guint8)*4);
 }
 
 void Oftvg::init_layout()
@@ -561,8 +568,7 @@ void Oftvg::process_default(guint8 *buf, int frame_number,
       OFTVG::MarkColor markcolor = element.getColor(frame_number);
       if (markcolor != OFTVG::MARKCOLOR_TRANSPARENT)
       {
-        const guint8* color =
-          (markcolor == OFTVG::MARKCOLOR_WHITE) ? filter->bit_on_color : filter->bit_off_color;
+        const guint8* color = color_array_[markcolor];
 
         for (int dx = 0; dx < element.width(); dx++)
         {
