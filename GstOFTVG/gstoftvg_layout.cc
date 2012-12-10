@@ -84,11 +84,18 @@ OFTVG::MarkColor GstOFTVGElement_SyncMark::getColor(int frameNumber) const
   }
   else if (syncidx_ == 3)
   {
-    // Multicolor sync marker
+    // 6-color sync marker
     const OFTVG::MarkColor sequence[6] =
       {OFTVG::MARKCOLOR_RED, OFTVG::MARKCOLOR_YELLOW, OFTVG::MARKCOLOR_GREEN,
        OFTVG::MARKCOLOR_CYAN, OFTVG::MARKCOLOR_BLUE, OFTVG::MARKCOLOR_PURPLE};
     return sequence[frameNumber % 6];
+  }
+  else if (syncidx_ == 4)
+  {
+    // 3-color sync marker
+    const OFTVG::MarkColor sequence[3] =
+      {OFTVG::MARKCOLOR_RED, OFTVG::MARKCOLOR_GREEN, OFTVG::MARKCOLOR_BLUE};
+    return sequence[frameNumber % 3];
   }
   else
   {
