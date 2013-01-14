@@ -374,11 +374,7 @@ GstFlowReturn Oftvg::handle_frame_numbers(GstBuffer* buf)
     // Calibration frames. No frame limit. Just time limit.
     max_frame_number = G_MAXINT64;
     GstClockTime ts = calibrationTimestamps[numCalibrationTimestamps-1];
-    // There are two syncmarks. So let's repeat when both syncmarks are on
-    // so there will not be a bump in the synchronization marks.
-    int syncFrames = 1 << 2;
-    if (buf->timestamp + buf->duration >= ts
-      && (frame_number + 1) % syncFrames == 0)
+    if (buf->timestamp + buf->duration >= ts)
     {
       filter->repeat_count++;
       return repeatFromZero(buf);
