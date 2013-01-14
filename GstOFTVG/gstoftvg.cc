@@ -66,8 +66,7 @@ using namespace OFTVG;
 GST_DEBUG_CATEGORY_STATIC (gst_oftvg_debug);
 #define GST_CAT_DEFAULT gst_oftvg_debug
 
-static const gchar* const DEFAULT_LAYOUT_LOCATION =
-  "../layout/test-layout-1920x1080-c.bmp";
+static const gchar* const DEFAULT_LAYOUT_LOCATION = "layout.bmp";
 
 static const gchar* const CALIBRATION_OFF = "off";
 static const gchar* const CALIBRATION_ONLY = "only";
@@ -76,11 +75,6 @@ static const gchar* const DEFAULT_CALIBRATION = CALIBRATION_OFF;
 static const bool DEFAULT_CALIBRATION_PREPEND = false;
 static const int DEFAULT_REPEAT = 1;
 static const int DEFAULT_NUM_BUFFERS = -1;
-
-/// The timestamps where each calibration phase ends.
-static const int numCalibrationTimestamps = 2;
-static const GstClockTime calibrationTimestamps[numCalibrationTimestamps] =
-  { 8 * GST_SECOND, 10 * GST_SECOND };
 
 /* Filter signals and args */
 enum
