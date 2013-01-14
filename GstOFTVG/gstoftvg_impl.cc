@@ -50,7 +50,7 @@ namespace OFTVG
 /// The timestamps where each calibration phase ends.
 static const int numCalibrationTimestamps = 2;
 static const GstClockTime calibrationTimestamps[numCalibrationTimestamps] =
-  { 8 * GST_SECOND, 10 * GST_SECOND };
+  { 4 * GST_SECOND, 5 * GST_SECOND };
 
 
 /* debug category for fltering log messages
