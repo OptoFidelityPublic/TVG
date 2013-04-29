@@ -199,6 +199,10 @@ gint64 Oftvg::get_max_output_frame_number(const GstBuffer* buf)
     else
       calibration_frames = 100; // Variable FPS, just make a guess (only messes up the percent readings).
   }
+  if (filter->calibration_append)
+  {
+    calibration_frames += 200;
+  }
   return calibration_frames +
     (get_max_frame_number() + 1) * filter->repeat;
 }
@@ -366,7 +370,12 @@ GstFlowReturn Oftvg::handle_frame_numbers(GstBuffer* buf)
 
   if (filter->repeat_count == 0 && !filter->calibration_prepend)
   {
-    // There was no calibration frames.
+    // There was no prepend calibration frames.
+    filter->repeat_count++;
+  }
+  else if (filter->repeat_count == filter->repeat + 1 && !filter->calibration_append)
+  {
+    // There was no append calibration frames.
     filter->repeat_count++;
   }
   else if (filter->repeat_count == 0)
@@ -380,16 +389,20 @@ GstFlowReturn Oftvg::handle_frame_numbers(GstBuffer* buf)
       return repeatFromZero(buf);
     }
   }
+  else if (filter->repeat_count == filter->repeat + 1)
+  {
+    max_frame_number = 200;
+  }
 
   if (frame_number >= max_frame_number
-    && filter->repeat_count < filter->repeat)
+    && filter->repeat_count < filter->repeat + (filter->calibration_append ? 1 : 0))
   {
     filter->repeat_count++;
     return repeatFromZero(buf);
   }
 
   if ((frame_number > max_frame_number)
-    || filter->repeat_count > filter->repeat)
+    || filter->repeat_count > filter->repeat + 1)
   {
     // Enough frames have been processed.
     if (!filter->silent)
@@ -397,6 +410,7 @@ GstFlowReturn Oftvg::handle_frame_numbers(GstBuffer* buf)
       g_print("gstoftvg: Enough frames have been processed: %d x %d.\n",
         filter->repeat_count, (int) frame_number);
     }
+
     /*
     "It is important to note that only elements driving the pipeline should ever
     send an EOS event. If your element is chain-based, it is not driving the
@@ -436,6 +450,11 @@ const GstOFTVGLayout&
         break;
       }
     }
+  }
+
+  if (filter->calibration_append && filter->repeat_count == filter->repeat + 1)
+  {
+    layout = &(filter->calibration_layouts[0]);
   }
 
   return *layout;

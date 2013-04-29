@@ -71,6 +71,7 @@ static const gchar* const DEFAULT_LAYOUT_LOCATION = "layout.bmp";
 static const gchar* const CALIBRATION_OFF = "off";
 static const gchar* const CALIBRATION_ONLY = "only";
 static const gchar* const CALIBRATION_PREPEND = "prepend";
+static const gchar* const CALIBRATION_BOTH = "both";
 static const gchar* const DEFAULT_CALIBRATION = CALIBRATION_OFF;
 static const bool DEFAULT_CALIBRATION_PREPEND = false;
 static const int DEFAULT_REPEAT = 1;
@@ -202,7 +203,7 @@ gst_oftvg_class_init (GstOFTVGClass* klass)
 
   g_object_class_install_property(gobject_class, PROP_CALIBRATION,
     g_param_spec_string ("calibration", "Calibration",
-      "(off|prepend|only). \"Only\" implies \"num-buffers=0\" and \"repeat=0\".",
+      "(off|prepend|only|both). \"Only\" implies \"num-buffers=0\" and \"repeat=0\".",
       DEFAULT_CALIBRATION,
       (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
 
@@ -275,10 +276,19 @@ gst_oftvg_set_property (GObject * object, guint prop_id,
       if (g_strcasecmp(CALIBRATION_OFF, str) == 0)
       {
         filter->oftvg.setCalibrationPrepend(false);
+        filter->oftvg.setCalibrationAppend(false);
       }
       else
       {
         filter->oftvg.setCalibrationPrepend(true);
+        if (g_strcasecmp(CALIBRATION_BOTH, str) == 0)
+        {
+          filter->oftvg.setCalibrationAppend(true);
+        }
+        else
+        {
+          filter->oftvg.setCalibrationAppend(false);
+        }
         if (g_strcasecmp(CALIBRATION_ONLY, str) == 0)
         {
           filter->oftvg.setNumBuffers(0);

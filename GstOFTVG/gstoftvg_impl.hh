@@ -65,6 +65,8 @@ public:
   /* Properties */
   bool getCalibrationPrepend() { return calibration_prepend; }
   void setCalibrationPrepend(bool value) { calibration_prepend = value; }
+  bool getCalibrationAppend() { return calibration_append; }
+  void setCalibrationAppend(bool value) { calibration_append = value; }
   int getNumBuffers() { return num_buffers; }
   void setNumBuffers(int value) { num_buffers = value; }
   int getRepeat() { return repeat; }
@@ -155,6 +157,7 @@ private:
   gchar* layout_location;
   /// Produce calibration frames in the beginning
   bool calibration_prepend;
+  bool calibration_append;
   /// Repeat first x frames n times.
   int repeat;
 

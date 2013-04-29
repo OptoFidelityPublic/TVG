@@ -1,0 +1,5 @@
+SET LAYOUT=layout_fpsonly.bmp
+SET CALIBRATION=both
+SET REPEAT=1
+SET NUM_BUFFERS=512
+SET PREPROCESS=! videoscale ! video/x-raw-yuv,width=1280,height=720
