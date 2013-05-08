@@ -35,6 +35,10 @@
 #include "gstoftvg_impl.hh"
 #include "gstoftvg_pixbuf.hh"
 
+#include <string>
+#include <fstream>
+#include <sstream>
+
 #if defined(_MSC_VER)
 #define Restrict __restrict
 #else
@@ -114,6 +118,7 @@ bool Oftvg::initParams()
 {
   Oftvg* filter = this;
   init_colorspace();
+  init_sequence();
   init_layout();
   return set_process_function();
 }
@@ -280,17 +285,79 @@ void Oftvg::init_layout()
     GstOFTVGLayout& layout = filter->calibration_layouts.back();
 
     ret &= gst_oftvg_load_layout_bitmap(filename, &error, &layout,
-      filter->width, filter->height, mode);
+      filter->width, filter->height, mode, sequence_data);
   }
 
   ret &= gst_oftvg_load_layout_bitmap(filename, &error, &filter->layout,
-    filter->width, filter->height, OFTVG::OVERLAY_MODE_DEFAULT);
+    filter->width, filter->height, OFTVG::OVERLAY_MODE_DEFAULT, sequence_data);
 
   if (!ret)
   {
     GST_ELEMENT_ERROR(&filter->element().element, RESOURCE, OPEN_READ,
       ("Could not open layout file: %s. %s", filename, error->message),
       (NULL));
+  }
+}
+
+static OFTVG::MarkColor char_to_color(char c)
+{
+  switch (c)
+  {
+    case 'w': return OFTVG::MARKCOLOR_WHITE;
+    case 'k': return OFTVG::MARKCOLOR_BLACK;
+    case 'r': return OFTVG::MARKCOLOR_RED;
+    case 'g': return OFTVG::MARKCOLOR_GREEN;
+    case 'b': return OFTVG::MARKCOLOR_BLUE;
+    case 'c': return OFTVG::MARKCOLOR_CYAN;
+    case 'm': return OFTVG::MARKCOLOR_PURPLE;
+    case 'y': return OFTVG::MARKCOLOR_YELLOW;
+    default: return OFTVG::MARKCOLOR_TRANSPARENT;
+  }
+}
+
+void Oftvg::init_sequence()
+{
+  if (strlen(custom_sequence) > 0)
+  {
+    std::ifstream file(custom_sequence);
+    sequence_data.clear();
+
+    if (!file.good())
+    {
+      g_print("Could not load the custom sequence file %s.\n", custom_sequence);
+      return;
+    }
+
+    int frame = 0;
+    OFTVG::MarkColor color = MarkColor::MARKCOLOR_WHITE;
+
+    while (file.good())
+    {
+      std::string line;
+      std::getline(file, line);
+
+      if (line.size() < 2 || line.at(0) == '#')
+        continue;
+
+      int newframe;
+      char newcolor;
+      std::istringstream linestream(line);
+      linestream >> newframe >> newcolor;
+
+      while (frame < newframe)
+      {
+        sequence_data.push_back(color);
+        frame++;
+      }
+
+      frame = newframe;
+      color = char_to_color(newcolor);
+
+      sequence_data.push_back(color);
+      frame++;
+    }
+
+    g_print("Loaded custom sequence with length %d\n", sequence_data.size());
   }
 }
 

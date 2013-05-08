@@ -78,6 +78,11 @@ public:
   }
   bool getSilent() { return silent; }
   void setSilent(bool value) { silent = value; }
+  const gchar *getCustomSequence() { return custom_sequence; }
+  void setCustomSequence(const gchar *value) {
+    g_free(custom_sequence);
+    custom_sequence = g_strdup(value);
+  }
 
   /* state */
   /// Returns the repeat counter value. 0 = calibration frames.
@@ -107,6 +112,7 @@ private:
   bool set_process_function();
   void init_colorspace();
   void init_layout();
+  void init_sequence();
 
   /// Report progress
   void report_progress(GstBuffer* buf);
@@ -155,6 +161,8 @@ private:
   /* properties */
   bool silent;
   gchar* layout_location;
+  gchar* custom_sequence;
+  std::vector<OFTVG::MarkColor> sequence_data;
   /// Produce calibration frames in the beginning
   bool calibration_prepend;
   bool calibration_append;

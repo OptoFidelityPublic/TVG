@@ -58,8 +58,8 @@ bool GstOFTVGElement_FrameID::propertiesEqual(const GstOFTVGElement &b) const
 }
 
 /* Sync marks */
-GstOFTVGElement_SyncMark::GstOFTVGElement_SyncMark(int x, int y, int width, int height, int syncidx):
-  GstOFTVGElement(x, y, width, height), syncidx_(syncidx)
+GstOFTVGElement_SyncMark::GstOFTVGElement_SyncMark(int x, int y, int width, int height, int syncidx, const std::vector<OFTVG::MarkColor> &customseq):
+  GstOFTVGElement(x, y, width, height), syncidx_(syncidx), customseq_(customseq)
 {
 
 }
@@ -96,6 +96,16 @@ OFTVG::MarkColor GstOFTVGElement_SyncMark::getColor(int frameNumber) const
     const OFTVG::MarkColor sequence[3] =
       {OFTVG::MARKCOLOR_RED, OFTVG::MARKCOLOR_GREEN, OFTVG::MARKCOLOR_BLUE};
     return sequence[frameNumber % 3];
+  }
+  else if (syncidx_ == 5)
+  {
+    // Custom color sequence
+    if (frameNumber < customseq_.size())
+      return customseq_.at(frameNumber);
+    else if (customseq_.size() > 0)
+      return customseq_.at(customseq_.size() - 1);
+    else
+      return OFTVG::MARKCOLOR_WHITE;
   }
   else
   {

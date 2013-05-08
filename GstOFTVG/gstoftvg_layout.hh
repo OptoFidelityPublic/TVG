@@ -112,13 +112,14 @@ private:
 class GstOFTVGElement_SyncMark: public GstOFTVGElement
 {
 public:
-  GstOFTVGElement_SyncMark(int x, int y, int width, int height, int syncidx);
+  GstOFTVGElement_SyncMark(int x, int y, int width, int height, int syncidx, const std::vector<OFTVG::MarkColor> &customseq);
   virtual OFTVG::MarkColor getColor(int frameNumber) const;
   virtual bool propertiesEqual(const GstOFTVGElement &b) const;
   virtual inline GstOFTVGElement *copy() const { return new GstOFTVGElement_SyncMark(*this); }
   
 private:
   int syncidx_;
+  const std::vector<OFTVG::MarkColor> &customseq_;
 };
 
 /* Subclass for calibration background */

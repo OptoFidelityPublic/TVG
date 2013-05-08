@@ -39,14 +39,15 @@ const static int gst_oftvg_BITS_PER_SAMPLE = 8;
 static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
   OFTVG::OverlayMode overlay_mode,
   int x, int y,
-  int red, int green, int blue)
+  int red, int green, int blue, const std::vector<OFTVG::MarkColor> &customseq)
 {
-  const int numSyncMarks = 4;
-  const int syncMarks[numSyncMarks][4] = {
+  const int numSyncMarks = 5;
+  const int syncMarks[numSyncMarks][5] = {
     { 255, 0,   0},
     { 0, 255,   0},
     { 0,   0, 255},
-    { 255,   0, 255}
+    { 255,   0, 255},
+    {255, 255, 0}
   };
 
   if (red == green && green == blue)
@@ -89,7 +90,7 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
         }
         else
         {
-          GstOFTVGElement_SyncMark element(x, y, 1, 1, i + 1);
+          GstOFTVGElement_SyncMark element(x, y, 1, 1, i + 1, customseq);
           layout->addElement(element);
         }
       }
@@ -107,7 +108,7 @@ static void gst_oftvg_init_calibration_layout_bg(GstOFTVGLayout* layout,
 
 /// Initialize a layout from a bitmap.
 static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
-  GstOFTVGLayout* layout, OFTVG::OverlayMode overlay_mode)
+  GstOFTVGLayout* layout, OFTVG::OverlayMode overlay_mode, const std::vector<OFTVG::MarkColor> &customseq)
 {
   int width = gdk_pixbuf_get_width(buf);
   int height = gdk_pixbuf_get_height(buf);
@@ -133,7 +134,7 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
       gst_oftvg_addElementFromRGB(layout, overlay_mode,
             x,
             y,
-            red, green, blue);
+            red, green, blue, customseq);
 
       p += n_channels * ((gst_oftvg_BITS_PER_SAMPLE + 7) / 8);
     }
@@ -153,7 +154,7 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
  */
 gboolean gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,
   GstOFTVGLayout* layout, int width, int height,
-  OFTVG::OverlayMode overlay_mode)
+  OFTVG::OverlayMode overlay_mode, const std::vector<OFTVG::MarkColor> &customseq)
 {
   GdkPixbuf* origbuf = gdk_pixbuf_new_from_file(filename, error);
   if (origbuf == NULL)
@@ -178,7 +179,7 @@ gboolean gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,
     gdk_pixbuf_scale_simple(origbuf, width, height, GDK_INTERP_NEAREST);
   gdk_pixbuf_unref(origbuf);
 
-  gst_oftvg_init_layout_from_bitmap(buf, layout, overlay_mode);
+  gst_oftvg_init_layout_from_bitmap(buf, layout, overlay_mode, customseq);
   gdk_pixbuf_unref(buf);
 
   return TRUE;

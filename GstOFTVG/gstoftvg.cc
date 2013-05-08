@@ -92,6 +92,7 @@ enum
   PROP_LOCATION,
   PROP_REPEAT,
   PROP_SILENT,
+  PROP_SEQUENCE,
 };
 
 /* the capabilities of the inputs and outputs.
@@ -226,6 +227,10 @@ gst_oftvg_class_init (GstOFTVGClass* klass)
     g_param_spec_boolean ("silent", "Silent", "Produce verbose output ?",
           FALSE, (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
 
+  g_object_class_install_property(gobject_class, PROP_SEQUENCE,
+    g_param_spec_string ("sequence", "Custom color sequence", "Text file with custom color sequence data.",
+      "", (GParamFlags)(G_PARAM_READWRITE)));
+
   btrans->event = GST_DEBUG_FUNCPTR(gst_oftvg_event);
   btrans->transform_ip = GST_DEBUG_FUNCPTR(gst_oftvg_transform_ip);
   btrans->set_caps     = GST_DEBUG_FUNCPTR(gst_oftvg_set_caps);
@@ -247,6 +252,7 @@ gst_oftvg_init (GstOFTVG* filter, GstOFTVGClass* klass)
   filter->oftvg.setCalibrationPrepend(DEFAULT_CALIBRATION_PREPEND);
   filter->oftvg.setRepeat(DEFAULT_REPEAT);
   filter->oftvg.setNumBuffers(DEFAULT_NUM_BUFFERS);
+  filter->oftvg.setCustomSequence("");
 
   GST_DEBUG("GstOFTVG initialized.\n");
 }
@@ -309,6 +315,10 @@ gst_oftvg_set_property (GObject * object, guint prop_id,
     case PROP_SILENT:
       filter->oftvg.setSilent(g_value_get_boolean(value)?true:false);
       break;
+    case PROP_SEQUENCE:
+      filter->oftvg.setCustomSequence(g_value_get_string(value));
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
       break;
@@ -343,6 +353,9 @@ gst_oftvg_get_property (GObject * object, guint prop_id,
       break;
     case PROP_SILENT:
       g_value_set_boolean(value, filter->oftvg.getSilent());
+      break;
+    case PROP_SEQUENCE:
+      g_value_set_string(value, filter->oftvg.getCustomSequence());
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);

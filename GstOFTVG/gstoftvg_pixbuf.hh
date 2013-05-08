@@ -44,7 +44,7 @@ class GstOFTVGLayout;
  */
 gboolean gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,
   GstOFTVGLayout* layout, int width, int height,
-  OFTVG::OverlayMode overlay_mode);
+  OFTVG::OverlayMode overlay_mode, const std::vector<OFTVG::MarkColor> &customseq);
 
 G_END_DECLS
 
