@@ -57,10 +57,10 @@ static const GstClockTime calibrationTimestamps[numCalibrationTimestamps] =
   { 4 * GST_SECOND, 5 * GST_SECOND };
 
 
-/* debug category for fltering log messages
+/* debug category for filtering log messages
  *
  */
-#define DEBUG_INIT(bla) \
+#define DEBUG_INIT \
   GST_DEBUG_CATEGORY_INIT (gst_oftvg_debug, "oftvg", 0, \
     "OptoFidelity Test Video Generator");
 
@@ -90,6 +90,7 @@ Oftvg::Oftvg()
   filter->repeat = 1;
   filter->num_buffers = -1;
   reset();
+  DEBUG_INIT
 }
 
 void Oftvg::reset()
@@ -135,8 +136,7 @@ bool Oftvg::atInputStreamEnd()
 
 void Oftvg::frame_counter_init(gint64 frame_counter)
 {
-  Oftvg* filter = this;
-  filter->frame_counter = frame_counter;
+  this->frame_counter = frame_counter;
 }
 
 void Oftvg::frame_counter_advance()
@@ -329,7 +329,7 @@ void Oftvg::init_sequence()
     }
 
     int frame = 0;
-    OFTVG::MarkColor color = MarkColor::MARKCOLOR_WHITE;
+    OFTVG::MarkColor color = OFTVG::MARKCOLOR_WHITE;
 
     while (file.good())
     {
@@ -370,6 +370,8 @@ void Oftvg::report_progress(GstBuffer* buf)
   gint64 max_frame_number = get_max_frame_number();
 
   GstClockTime timestamp = GST_BUFFER_TIMESTAMP(buf);
+
+  GST_INFO("Found buffer %ld, stopping at %ld", GST_BUFFER_OFFSET(buf), get_max_frame_number());
 
   if (timestamp / GST_SECOND - filter->progress_timestamp / GST_SECOND != 0)
   {
@@ -453,6 +455,7 @@ GstFlowReturn Oftvg::handle_frame_numbers(GstBuffer* buf)
     if (buf->timestamp + buf->duration >= ts)
     {
       filter->repeat_count++;
+	  GST_INFO("Repeat 0");
       return repeatFromZero(buf);
     }
   }
@@ -465,12 +468,15 @@ GstFlowReturn Oftvg::handle_frame_numbers(GstBuffer* buf)
     && filter->repeat_count < filter->repeat + (filter->calibration_append ? 1 : 0))
   {
     filter->repeat_count++;
+	GST_INFO("Repeating 1");
     return repeatFromZero(buf);
   }
 
   if ((frame_number > max_frame_number)
     || filter->repeat_count > filter->repeat + 1)
   {
+	GST_INFO("Stopping... %ld/%ld, %d/%d", frame_number, max_frame_number, filter->repeat_count, filter->repeat);
+
     // Enough frames have been processed.
     if (!filter->silent)
     {
@@ -488,7 +494,7 @@ GstFlowReturn Oftvg::handle_frame_numbers(GstBuffer* buf)
     bus depending on the mode of operation)."
     http://gstreamer.freedesktop.org/data/doc/gstreamer/head/pwg/html/section-events-definitions.html
     */
-    gst_pad_push_event(filter->element().srcpad, gst_event_new_eos());
+    //gst_pad_push_event(filter->element().srcpad, gst_event_new_eos());
     return GST_FLOW_UNEXPECTED;
   }
 

@@ -162,7 +162,7 @@ void GstOFTVGLayout::addElement(const GstOFTVGElement& element)
     for (int y = element.y(); y < element.y() + element.height(); ++y)
     {
       // Copy element
-      std::shared_ptr<GstOFTVGElement> rowElement(element.copy());
+      std::tr1::shared_ptr<GstOFTVGElement> rowElement(element.copy());
       rowElement->height_ = 1;
       rowElement->y_ = y;
       addElement(*rowElement);
@@ -182,7 +182,7 @@ void GstOFTVGLayout::addElement(const GstOFTVGElement& element)
   // Otherwise, add as a new element
   else
   {
-    elements_.push_back(std::shared_ptr<GstOFTVGElement>(element.copy()));
+    elements_.push_back(std::tr1::shared_ptr<GstOFTVGElement>(element.copy()));
   }
 }
 

@@ -56,11 +56,11 @@ public:
 
   /// Initializes parameters of the filter.
   /// Precondition: videoFormatSetCaps has been called successfully.
-  bool Oftvg::initParams();
+  bool initParams();
 
   /// Processes one frame.
   /// Precondition: gst_oftvg_init_params has been called succesfully.
-  GstFlowReturn Oftvg::gst_oftvg_transform_ip(GstBuffer *buf);
+  GstFlowReturn gst_oftvg_transform_ip(GstBuffer *buf);
 
   /* Properties */
   bool getCalibrationPrepend() { return calibration_prepend; }

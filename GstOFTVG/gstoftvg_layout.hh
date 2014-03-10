@@ -34,7 +34,7 @@
 #define __GSTOFTVG_LAYOUT_HH__
 
 #include <vector>
-#include <memory>
+#include <tr1/memory>
 #include <glib.h>
 
 namespace OFTVG
@@ -68,7 +68,7 @@ class GstOFTVGLayout;
 class GstOFTVGElement
 {
 public:
-  GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height);
+  GstOFTVGElement(int x, int y, int width, int height);
 
   inline const int& x() const { return x_; }
   inline const int& y() const { return y_; }
@@ -83,7 +83,7 @@ public:
   virtual bool propertiesEqual(const GstOFTVGElement &b) const = 0;
 
   /// Identical copy of this element
-  virtual inline GstOFTVGElement *copy() const = 0;
+  virtual GstOFTVGElement *copy() const = 0;
 
 private:
   int x_;
@@ -163,7 +163,7 @@ public:
   int maxFrameNumber() const;
 
 private:
-  std::vector<std::shared_ptr<GstOFTVGElement>> elements_;
+  std::vector<std::tr1::shared_ptr<GstOFTVGElement> > elements_;
 };
 
 
