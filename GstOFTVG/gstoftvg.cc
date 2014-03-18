@@ -104,21 +104,21 @@ GST_STATIC_PAD_TEMPLATE (
   GST_PAD_SINK,
   GST_PAD_ALWAYS,
   GST_STATIC_CAPS(
-    GST_VIDEO_CAPS_YUV("AYUV") ";"
-    GST_VIDEO_CAPS_YUV("Y444") ";"
-    GST_VIDEO_CAPS_YUV("Y42B") ";"
-    GST_VIDEO_CAPS_YUV("I420") ";"
-    GST_VIDEO_CAPS_YUV("YV12") ";"
-    GST_VIDEO_CAPS_YUV("Y41B") ";"
-    GST_VIDEO_CAPS_YUV("YUY2") ";"
-    GST_VIDEO_CAPS_YUV("YVYU") ";"
-    GST_VIDEO_CAPS_YUV("UYVY") ";"
-    GST_VIDEO_CAPS_RGB  ";"
-    GST_VIDEO_CAPS_RGBx ";"
-    GST_VIDEO_CAPS_xRGB ";"
-    GST_VIDEO_CAPS_BGR  ";"
-    GST_VIDEO_CAPS_BGRx ";"
-    GST_VIDEO_CAPS_xBGR ";"
+    GST_VIDEO_CAPS_MAKE("AYUV") ";"
+    GST_VIDEO_CAPS_MAKE("Y444") ";"
+    GST_VIDEO_CAPS_MAKE("Y42B") ";"
+    GST_VIDEO_CAPS_MAKE("I420") ";"
+    GST_VIDEO_CAPS_MAKE("YV12") ";"
+    GST_VIDEO_CAPS_MAKE("Y41B") ";"
+    GST_VIDEO_CAPS_MAKE("YUY2") ";"
+    GST_VIDEO_CAPS_MAKE("YVYU") ";"
+    GST_VIDEO_CAPS_MAKE("UYVY") ";"
+    GST_VIDEO_CAPS_MAKE("RGB")  ";"
+    GST_VIDEO_CAPS_MAKE("RGBx") ";"
+    GST_VIDEO_CAPS_MAKE("xRGB") ";"
+    GST_VIDEO_CAPS_MAKE("BGR")  ";"
+    GST_VIDEO_CAPS_MAKE("BGRx") ";"
+    GST_VIDEO_CAPS_MAKE("xBGR") ";"
   )
 );
 
@@ -130,15 +130,10 @@ GST_STATIC_PAD_TEMPLATE (
   GST_STATIC_CAPS ("ANY")
 );
 
-/* debug category for fltering log messages
- *
- */
-#define DEBUG_INIT(bla) \
-  GST_DEBUG_CATEGORY_INIT (gst_oftvg_debug, "oftvg", 0, \
-    "OptoFidelity Test Video Generator");
+static void gst_oftvg_init (GstOFTVG* filter);
+static void gst_oftvg_class_init (GstOFTVGClass* klass);
 
-GST_BOILERPLATE_FULL (GstOFTVG, gst_oftvg, GstBaseTransform,
-    GST_TYPE_BASE_TRANSFORM, DEBUG_INIT);
+G_DEFINE_TYPE (GstOFTVG, gst_oftvg, GST_TYPE_BASE_TRANSFORM);
 
 static void gst_oftvg_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec);
@@ -167,8 +162,7 @@ static gboolean gst_oftvg_start(GstBaseTransform* btrans);
  * initialize the plug-in itself
  * register the element factories and other features
  */
-static gboolean
-oftvg_init (GstPlugin* oftvg)
+gboolean oftvg_init (GstPlugin* oftvg)
 {
   return gst_element_register (oftvg, "oftvg", GST_RANK_NONE, GST_TYPE_OFTVG);
 }
@@ -179,17 +173,6 @@ static void
 gst_oftvg_base_init (gpointer klass)
 {
   GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
-
-  gst_element_class_set_details_simple (element_class,
-    "OFTVG",
-    "Filter/Editor/Video",
-    "Overlays buffer timestamps on a video stream",
-    "OptoFidelity <info@optofidelity.com>");
-
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&src_template));
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&sink_template));
 }
 
 /* initialize the oftvg's class */
@@ -199,6 +182,18 @@ gst_oftvg_class_init (GstOFTVGClass* klass)
   GObjectClass *gobject_class = (GObjectClass *) klass;
   GstBaseTransformClass* btrans = GST_BASE_TRANSFORM_CLASS (klass);
 
+  GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
+  gst_element_class_set_metadata (element_class,
+    "OptoFidelity test video generator",
+    "Filter/Editor/Video",
+    "Overlays buffer timestamps on a video stream",
+    "OptoFidelity <info@optofidelity.com>");
+	
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&src_template));
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&sink_template));
+	
   gobject_class->set_property = gst_oftvg_set_property;
   gobject_class->get_property = gst_oftvg_get_property;
 
@@ -231,20 +226,19 @@ gst_oftvg_class_init (GstOFTVGClass* klass)
     g_param_spec_string ("sequence", "Custom color sequence", "Text file with custom color sequence data.",
       "", (GParamFlags)(G_PARAM_READWRITE)));
 
-  btrans->event = GST_DEBUG_FUNCPTR(gst_oftvg_event);
+  btrans->sink_event = GST_DEBUG_FUNCPTR(gst_oftvg_event);
   btrans->transform_ip = GST_DEBUG_FUNCPTR(gst_oftvg_transform_ip);
   btrans->set_caps     = GST_DEBUG_FUNCPTR(gst_oftvg_set_caps);
   btrans->start = GST_DEBUG_FUNCPTR(gst_oftvg_start);
+  
+  GST_DEBUG_CATEGORY_INIT(gst_oftvg_debug, "oftvg", 0, "");
 }
 
 /* initialize the new element
  * initialize instance structure
  */
-static void
-gst_oftvg_init (GstOFTVG* filter, GstOFTVGClass* klass)
+static void gst_oftvg_init (GstOFTVG* filter)
 {
-  /* unused parameter */ klass;
-
   // use placement new to construct the object in the memory already allocated.
   ::new (&(filter->oftvg)) OFTVG::Oftvg();
   filter->oftvg.setElement(filter->element);
@@ -254,7 +248,7 @@ gst_oftvg_init (GstOFTVG* filter, GstOFTVGClass* klass)
   filter->oftvg.setNumBuffers(DEFAULT_NUM_BUFFERS);
   filter->oftvg.setCustomSequence("");
 
-  GST_DEBUG("GstOFTVG initialized.\n");
+  GST_DEBUG("GstOFTVG initialized.");
 }
 
 
@@ -279,7 +273,7 @@ gst_oftvg_set_property (GObject * object, guint prop_id,
     case PROP_CALIBRATION:
     {
       const gchar* str = g_value_get_string(value);
-      if (g_strcasecmp(CALIBRATION_OFF, str) == 0)
+      if (g_ascii_strncasecmp(CALIBRATION_OFF, str, strlen(CALIBRATION_OFF) + 1) == 0)
       {
         filter->oftvg.setCalibrationPrepend(false);
         filter->oftvg.setCalibrationAppend(false);
@@ -287,7 +281,7 @@ gst_oftvg_set_property (GObject * object, guint prop_id,
       else
       {
         filter->oftvg.setCalibrationPrepend(true);
-        if (g_strcasecmp(CALIBRATION_BOTH, str) == 0)
+        if (g_ascii_strncasecmp(CALIBRATION_BOTH, str, strlen(CALIBRATION_BOTH) + 1) == 0)
         {
           filter->oftvg.setCalibrationAppend(true);
         }
@@ -295,7 +289,7 @@ gst_oftvg_set_property (GObject * object, guint prop_id,
         {
           filter->oftvg.setCalibrationAppend(false);
         }
-        if (g_strcasecmp(CALIBRATION_ONLY, str) == 0)
+        if (g_ascii_strncasecmp(CALIBRATION_ONLY, str, strlen(CALIBRATION_ONLY)) == 0)
         {
           filter->oftvg.setNumBuffers(0);
           filter->oftvg.setRepeat(0);
@@ -411,23 +405,25 @@ static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event)
   {
     case GST_EVENT_FLUSH_START:
     case GST_EVENT_FLUSH_STOP:
-    case GST_EVENT_NEWSEGMENT:
+    case GST_EVENT_SEGMENT:
       // Block the events related to the repeat seek from propagating downstream.
       // We kind of split the pipeline in half: upstream seeks back to the start
       // of video while downstream keeps going.
       if (filter->oftvg.getRepeatCount() > 0)
       {
         // drop event
-        ret = FALSE;
+		GST_INFO("Dropping event.");
+		gst_event_unref(event);
+        ret = TRUE;
       }
-      else if (GST_EVENT_TYPE(event) == GST_EVENT_NEWSEGMENT)
+      else if (GST_EVENT_TYPE(event) == GST_EVENT_SEGMENT)
       {
-        // Patch other NEWSEGMENT events so that the end time is indeterminate.
+        // Patch other SEGMENT events so that the end time is indeterminate.
         // The default value is the length of the input video, but due to repeats
         // our output may be longer.
-        event = gst_event_new_new_segment(false, 1.0, GST_FORMAT_TIME, 0, -1, 0);
-        gst_pad_push_event (filter->element.srcpad, event);
-        ret = FALSE;
+        // event = gst_event_new_segment(false, 1.0, GST_FORMAT_TIME, 0, -1, 0); TODO!
+		GST_INFO("Pushing event forward.");
+        ret = gst_pad_push_event (filter->element.srcpad, event);
       }
       break;
     case GST_EVENT_EOS:
@@ -437,10 +433,20 @@ static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event)
           ("Stream ended prematurely."), (NULL));
       }
       // Pass on.
-      ret = TRUE;
+      ret = gst_pad_push_event (filter->element.srcpad, event);
       break;
+/*
+    case GST_EVENT_CAPS:
+      GstCaps *caps;
+      gst_event_parse_caps (event, &caps);
+	  gst_pad_peer_query_caps (filter->element.srcpad, caps);
+	  gst_event_unref(event);
+	  ret = TRUE;
+	  
+      break;
+*/
     default:
-      ret = TRUE;
+      ret = gst_pad_push_event (filter->element.srcpad, event);
       break;
   }
 
@@ -457,7 +463,7 @@ gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
 
   GstFlowReturn ret = filter->oftvg.gst_oftvg_transform_ip(buf);
 
-  if (GST_FLOW_IS_SUCCESS(ret))
+  if (ret == GST_FLOW_OK)
   {
     gst_oftvg_process_ip_end_timing(filter, timer1);
   }
@@ -498,7 +504,7 @@ static gboolean gst_oftvg_set_caps(GstBaseTransform* object,
 GST_PLUGIN_DEFINE (
     GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    "oftvg",
+    oftvg,
     "OptoFidelity Test Video Generator",
     oftvg_init,
     "Compiled " __DATE__ " " __TIME__,

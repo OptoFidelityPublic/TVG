@@ -109,7 +109,6 @@ private:
   gint64 get_max_output_frame_number(const GstBuffer* buf);
 
   /* initialization */
-  bool set_process_function();
   void init_colorspace();
   void init_layout();
   void init_sequence();
@@ -123,13 +122,15 @@ private:
   const GstOFTVGLayout&
     get_layout(const GstBuffer* buf);
   
-  void process_default(guint8 *buf, int frame_number,
+  void process_default(GstBuffer *buf, int frame_number,
     const GstOFTVGLayout& layout);
   
 private:
   GstBaseTransform* element_;
 
   /* caps */
+  GstVideoInfo in_info;
+  GstVideoFormatInfo const *in_format_info;
   GstVideoFormat in_format;
   GstVideoFormat out_format;
   int width;
@@ -172,8 +173,6 @@ private:
   /* processing function */
   typedef void (Oftvg::*ProcessInplaceFunc)(guint8* buf, int frame_number,
     const GstOFTVGLayout& layout);
-  
-  ProcessInplaceFunc process_inplace;
 
   /* precalculated values */
   guint8 (*color_array_)[4];

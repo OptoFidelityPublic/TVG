@@ -36,6 +36,7 @@
 #include "gstoftvg_pixbuf.hh"
 
 #include <string>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 
@@ -71,13 +72,13 @@ static int gst_oftvg_integer_log2(int val);
 /// Gets the amount that x coordinate needs to be shifted to the right
 /// to get a matching coordinate in the component data that is possibly
 /// subsampled.
-static int gst_oftvg_get_subsampling_h_shift(GstVideoFormat format,
+static int gst_oftvg_get_subsampling_h_shift(GstVideoInfo *info,
   int component, int width);
 
 /// Gets the amount that y coordinate needs to be shifted to the right
 /// to get a matching coordinate in the component data that is possibly
 /// subsampled.
-static int gst_oftvg_get_subsampling_v_shift(GstVideoFormat format,
+static int gst_oftvg_get_subsampling_v_shift(GstVideoInfo *info,
   int component, int height);
 
 Oftvg::Oftvg()
@@ -110,9 +111,16 @@ void Oftvg::reset()
 
 bool Oftvg::videoFormatSetCaps(GstCaps* incaps)
 {
-  Oftvg* filter = this;
-  return ::gst_video_format_parse_caps(incaps, &filter->in_format,
-            &filter->width, &filter->height)?true:false;
+  gst_video_info_init(&in_info);
+  if (!gst_caps_is_fixed(incaps) || !gst_video_info_from_caps(&in_info, incaps)) {
+	  return false;
+  }
+
+  this->in_format = GST_VIDEO_INFO_FORMAT(&in_info);
+  this->in_format_info = gst_video_format_get_info(this->in_format);
+  this->width = GST_VIDEO_INFO_WIDTH(&in_info);
+  this->height = GST_VIDEO_INFO_HEIGHT(&in_info);
+  return true;
 }
 
 bool Oftvg::initParams()
@@ -121,7 +129,13 @@ bool Oftvg::initParams()
   init_colorspace();
   init_sequence();
   init_layout();
-  return set_process_function();
+  if (GST_VIDEO_FORMAT_INFO_IS_YUV(in_format_info)
+    || GST_VIDEO_FORMAT_INFO_IS_RGB(in_format_info)) {
+	  return true;
+  }
+  else {
+	  return false;
+  }
 }
 
 bool Oftvg::atInputStreamEnd()
@@ -212,18 +226,6 @@ gint64 Oftvg::get_max_output_frame_number(const GstBuffer* buf)
     (get_max_frame_number() + 1) * filter->repeat;
 }
 
-bool Oftvg::set_process_function()
-{
-  Oftvg* filter = this;
-  if (gst_video_format_is_yuv(filter->in_format)
-    || gst_video_format_is_rgb(filter->in_format))
-  {
-    filter->process_inplace = &Oftvg::process_default;
-  }
-  
-  return filter->process_inplace != NULL;
-}
-
 static guint8 color_array_yuv[20][4] = {
   {   0, 128, 128, 0},
   { 128,  64, 255, 0},
@@ -250,7 +252,7 @@ void Oftvg::init_colorspace()
 {
   Oftvg* filter = this;
 
-  if (gst_video_format_is_yuv(filter->in_format))
+  if (GST_VIDEO_FORMAT_INFO_IS_YUV(in_format_info))
   {
     color_array_ = color_array_yuv;
   }
@@ -452,7 +454,7 @@ GstFlowReturn Oftvg::handle_frame_numbers(GstBuffer* buf)
     // Calibration frames. No frame limit. Just time limit.
     max_frame_number = G_MAXINT64;
     GstClockTime ts = calibrationTimestamps[numCalibrationTimestamps-1];
-    if (buf->timestamp + buf->duration >= ts)
+    if (GST_BUFFER_PTS(buf) + GST_BUFFER_DURATION(buf) >= ts)
     {
       filter->repeat_count++;
 	  GST_INFO("Repeat 0");
@@ -495,7 +497,7 @@ GstFlowReturn Oftvg::handle_frame_numbers(GstBuffer* buf)
     http://gstreamer.freedesktop.org/data/doc/gstreamer/head/pwg/html/section-events-definitions.html
     */
     //gst_pad_push_event(filter->element().srcpad, gst_event_new_eos());
-    return GST_FLOW_UNEXPECTED;
+    return GST_FLOW_EOS;
   }
 
   frame_counter_advance();
@@ -543,7 +545,7 @@ GstFlowReturn Oftvg::gst_oftvg_transform_ip(GstBuffer *buf)
   GST_BUFFER_TIMESTAMP(buf) += filter->timestamp_offset;
   GstFlowReturn ret = handle_frame_numbers(buf);
 
-  if (GST_FLOW_IS_SUCCESS(ret))
+  if (ret == GST_FLOW_OK)
   {
     const GstOFTVGLayout& layout = get_layout(buf);
 
@@ -556,8 +558,7 @@ GstFlowReturn Oftvg::gst_oftvg_transform_ip(GstBuffer *buf)
     gint64 frame_number = input_frame_number(buf);
 
     // Call through member function pointer.
-    (filter->*(process_inplace))
-      (GST_BUFFER_DATA(buf), (int) frame_number, layout);
+    process_default(buf, (int) frame_number, layout);
   }
 
   return ret;
@@ -583,22 +584,22 @@ static int gst_oftvg_integer_log2(int val)
 /// Gets the amount that x coordinate needs to be shifted to the right
 /// to get a matching coordinate in the component data that is possibly
 /// subsampled.
-static int gst_oftvg_get_subsampling_h_shift(GstVideoFormat format,
+static int gst_oftvg_get_subsampling_h_shift(GstVideoInfo *info,
   int component, int width)
 {
   int val =
-    width / gst_video_format_get_component_width(format, component, width);
+    width / GST_VIDEO_INFO_COMP_WIDTH(info, component);
   return gst_oftvg_integer_log2(val);
 }
 
 /// Gets the amount that y coordinate needs to be shifted to the right
 /// to get a matching coordinate in the component data that is possibly
 /// subsampled.
-static int gst_oftvg_get_subsampling_v_shift(GstVideoFormat format,
+static int gst_oftvg_get_subsampling_v_shift(GstVideoInfo *info,
   int component, int height)
 {
   int val =
-    height / gst_video_format_get_component_height(format, component, height);
+    height / GST_VIDEO_INFO_COMP_HEIGHT(info, component);
   return gst_oftvg_integer_log2(val);
 }
 
@@ -609,33 +610,35 @@ static int gst_oftvg_get_subsampling_v_shift(GstVideoFormat format,
 
 /// Generic processing function. The color components to use are
 /// determined by filter->color.
-/// Note: gst_oftvg_set_process_function determines
-/// which processing function to use.
-void Oftvg::process_default(guint8 *buf, int frame_number,
+void Oftvg::process_default(GstBuffer *buf, int frame_number,
   const GstOFTVGLayout& layout)
 {
   Oftvg* filter = this;
   GstVideoFormat format = filter->in_format;
 
+  GstMapInfo mapinfo;
+  // ToDo: Check if succeess
+  gst_buffer_map(buf, &mapinfo, GST_MAP_WRITE);
+  guint8 *bufmem = mapinfo.data;
   const int width = filter->width;
   const int height = filter->height;
 
   guint8* const bufY =
-    buf + gst_video_format_get_component_offset(format, 0, width, height);
-  int y_stride  = gst_video_format_get_row_stride(format, 0, width);
-  int yoff = gst_video_format_get_pixel_stride(format, 0);
+    bufmem + GST_VIDEO_INFO_COMP_OFFSET(&in_info, 0);
+  int y_stride  =  GST_VIDEO_INFO_COMP_STRIDE(&in_info, 0);
+  int yoff = GST_VIDEO_FORMAT_INFO_PSTRIDE(in_format_info, 0);
   
-  int h_subs = gst_oftvg_get_subsampling_h_shift(format, 1, width);
-  int v_subs = gst_oftvg_get_subsampling_v_shift(format, 1, height);
+  int h_subs = gst_oftvg_get_subsampling_h_shift(&in_info, 1, width);
+  int v_subs = gst_oftvg_get_subsampling_v_shift(&in_info, 1, height);
 
   guint8* const bufU =
-    buf + gst_video_format_get_component_offset(format, 1, width, height);
+    bufmem + GST_VIDEO_INFO_COMP_OFFSET(&in_info, 1);
   guint8* const bufV =
-    buf + gst_video_format_get_component_offset(format, 2, width, height);
+    bufmem + GST_VIDEO_INFO_COMP_OFFSET(&in_info, 2);
   
-  int uv_stride = gst_video_format_get_row_stride(format, 1, width);
-  int uoff = gst_video_format_get_pixel_stride(format, 1);
-  int voff = gst_video_format_get_pixel_stride(format, 2);
+  int uv_stride = GST_VIDEO_INFO_COMP_STRIDE(&in_info, 1);
+  int uoff = GST_VIDEO_FORMAT_INFO_PSTRIDE(in_format_info, 1);
+  int voff = GST_VIDEO_FORMAT_INFO_PSTRIDE(in_format_info, 2);
 
   if (layout.size() != 0)
   {
@@ -674,6 +677,8 @@ void Oftvg::process_default(guint8 *buf, int frame_number,
       }
     }
   }
+
+  gst_buffer_unmap(buf, &mapinfo);
 }
 
 
