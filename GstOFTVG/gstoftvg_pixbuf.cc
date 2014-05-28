@@ -157,7 +157,7 @@ gboolean gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,
   OFTVG::OverlayMode overlay_mode, const std::vector<OFTVG::MarkColor> &customseq)
 {
   GdkPixbuf* origbuf = gdk_pixbuf_new_from_file(filename, error);
-  GdkPixbuf* buf = nullptr;
+  GdkPixbuf* buf = NULL;
   if (origbuf == NULL)
   {
     // Error is set by gdk_pixbuf_new_from_file directly.
@@ -177,17 +177,17 @@ gboolean gst_oftvg_load_layout_bitmap(const gchar* filename, GError **error,
   }
   
   buf = gdk_pixbuf_scale_simple(origbuf, width, height, GDK_INTERP_NEAREST);
-  gdk_pixbuf_unref(origbuf);
+  g_object_unref(origbuf);
 
   gst_oftvg_init_layout_from_bitmap(buf, layout, overlay_mode, customseq);
-  gdk_pixbuf_unref(buf);
+  g_object_unref(buf);
 
   return TRUE;
 
 error:
   if (origbuf != NULL)
   {
-    gdk_pixbuf_unref(origbuf);
+    g_object_unref(origbuf);
   }
   return FALSE;
 }

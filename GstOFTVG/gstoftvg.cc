@@ -43,7 +43,7 @@
 #endif
 
 #include <new>
-
+#include <string.h>
 #include <gst/gst.h>
 #include <gst/base/gstbasetransform.h>
 #include <gst/video/video.h>
@@ -371,7 +371,7 @@ static void gst_oftvg_process_ip_end_timing(GstOFTVG* filter,
   {
     static double total_oftvg_time = 0;
     static int timer_counter = 0;
-    static timemeasure_t total_pipeline_timer = 0;
+    static timemeasure_t total_pipeline_timer;
     total_oftvg_time += end_timing(timer1, "gst_oftvg_transform_ip");
 
     if (timer_counter == 0)

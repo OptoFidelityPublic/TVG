@@ -29,6 +29,7 @@
 #endif
 
 #include <memory>
+#include <cstring>
 #include "gstoftvg_layout.hh"
 
 GstOFTVGElement::GstOFTVGElement(int x, int y, int width, int height)
@@ -54,7 +55,7 @@ OFTVG::MarkColor GstOFTVGElement_FrameID::getColor(int frameNumber) const
 bool GstOFTVGElement_FrameID::propertiesEqual(const GstOFTVGElement &b) const
 {
   const GstOFTVGElement_FrameID *other = dynamic_cast<const GstOFTVGElement_FrameID*>(&b);
-  return (other != nullptr && frameid_ == other->frameid_);
+  return (other && frameid_ == other->frameid_);
 }
 
 /* Sync marks */
@@ -116,7 +117,7 @@ OFTVG::MarkColor GstOFTVGElement_SyncMark::getColor(int frameNumber) const
 bool GstOFTVGElement_SyncMark::propertiesEqual(const GstOFTVGElement &b) const
 {
   const GstOFTVGElement_SyncMark *other = dynamic_cast<const GstOFTVGElement_SyncMark*>(&b);
-  return (other != nullptr && syncidx_ == other->syncidx_);
+  return (other && syncidx_ == other->syncidx_);
 }
 
 /* Background for calibration */
@@ -134,7 +135,7 @@ OFTVG::MarkColor GstOFTVGElement_Constant::getColor(int frameNumber) const
 bool GstOFTVGElement_Constant::propertiesEqual(const GstOFTVGElement &b) const
 {
   const GstOFTVGElement_Constant *other = dynamic_cast<const GstOFTVGElement_Constant*>(&b);
-  return (other != nullptr && color_ == other->color_);
+  return (other && color_ == other->color_);
 }
 
 /* GstOFTVGLayout class */
@@ -192,7 +193,7 @@ int GstOFTVGLayout::maxFrameNumber() const
   for (int i = 0; i < size(); i++)
   {
     const GstOFTVGElement_FrameID *frameid = dynamic_cast<const GstOFTVGElement_FrameID*>(at(i));
-    if (frameid != nullptr)
+    if (frameid)
     {
       if (frameid->getFrameId() > maxid)
         maxid = frameid->getFrameId();
