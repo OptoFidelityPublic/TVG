@@ -50,7 +50,7 @@ oftvgdir="\$(libdir)/gstreamer-1.0"
 AC_SUBST(oftvgdir)
 
 # LDFLAGS for GStreamer plugins
-GST_PLUGIN_LDFLAGS='-module -avoid-version -export-symbols-regex [_]*\(gst_\|Gst\|GST_\).*'
+GST_PLUGIN_LDFLAGS='-module -avoid-version -export-symbols-regex [_]*\(gst_\|Gst\|GST_\).* -no-undefined'
 AC_SUBST(GST_PLUGIN_LDFLAGS)
 
 AC_CONFIG_FILES([Makefile GstOFTVG/Makefile])
