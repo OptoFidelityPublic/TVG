@@ -1,0 +1,12 @@
+# -*- Mode: Python -*- vi:si:et:sw=4:sts=4:ts=4:syntax=python
+
+
+class Recipe(recipe.Recipe):
+    name = 'oftvg'
+    version = '0.9'
+    licenses = [License.GPLv2Plus]
+    deps = ['gstreamer-1.0']
+    remotes = {'upstream': '/home/optofidelity/dev/oftvg'}
+    commit = 'upstream/gst1.0'
+    config_sh = "sh ./autogen.sh && ./configure"
+    files_plugins = ['lib/gstreamer-1.0/libgstoftvg%(mext)s']

@@ -1,0 +1,13 @@
+
+class Package(package.Package):
+    name = 'oftvg'
+    shortdesc = 'OptoFidelity Test Video Generator'
+    version = '0.9'
+    vendor = "OptoFidelity"
+    license = License.GPLv2Plus
+    uuid='ce31aa11-e69a-4ced-b7d0-ca3ae36c039a'
+    files=['oftvg']
+    deps=['gstreamer-1.0',
+          'gst-plugins-good-1.0',
+          'gdk-pixbuf']
+
