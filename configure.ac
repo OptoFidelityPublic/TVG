@@ -6,6 +6,7 @@ AC_INIT([oftvg], [0.9], NULL, oftvg)
 AC_CONFIG_SRCDIR([GstOFTVG/gstoftvg.cc])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_AUX_DIR([build-aux])
 
 AM_INIT_AUTOMAKE([1.10])
 

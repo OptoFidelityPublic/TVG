@@ -6,7 +6,7 @@ class Recipe(recipe.Recipe):
     version = '0.9'
     licenses = [License.GPLv2Plus]
     deps = ['gstreamer-1.0']
-    remotes = {'upstream': '/home/optofidelity/dev/oftvg'}
+    remotes = {'upstream': 'https://code.google.com/p/oftvg/'}
     commit = 'upstream/gst1.0'
     config_sh = "sh ./autogen.sh && ./configure"
     files_plugins = ['lib/gstreamer-1.0/libgstoftvg%(mext)s']
