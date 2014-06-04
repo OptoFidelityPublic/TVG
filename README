@@ -4,7 +4,7 @@ available at http://code.google.com/p/oftvg/downloads/list.
 
 --
 
-Compiling:
+Compiling (for Windows 64-bit target, on 64-bit Linux host):
 
 1. Checkout newest cerbero from Git repo.
    Note: do not place it directly in ~, because ~/cerbero will be used for
@@ -22,4 +22,7 @@ Compiling:
 4. Build oftvg using the included config file
    ./cerbero-uninstalled -c ~/oftvg/cerbero/cross-win64.cbc build oftvg 
 
-(TODO: Packaging scripts)
+5. Run the packaging script:
+   distribution/make_windows_pkg.sh ~/cerbero/dist/windows_x86_64
+
+

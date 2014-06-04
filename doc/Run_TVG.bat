@@ -77,10 +77,10 @@ set GST_DEBUG_FILE=%DEBUGDIR%\log.txt
 set GST_DEBUG=*:3
 
 :: Actual command that executes gst-launch
-gst-launch -q --gst-plugin-load=GstOFTVG.dll ^
-	filesrc location=%INPUT% ! decodebin2 name=decode %PREPROCESS% ! queue ^
+gst-launch-1.0 -q ^
+	filesrc location=%INPUT% ! decodebin name=decode %PREPROCESS% ! queue ^
 	! oftvg location=%LAYOUT% num-buffers=%NUM_BUFFERS% repeat=%REPEAT% calibration=%CALIBRATION% silent=1 ^
-	! queue ! colorspace ! %COMPRESSION% ! %CONTAINER% ! filesink location=%OUTPUT%
+	! queue ! videoconvert ! %COMPRESSION% ! %CONTAINER% ! filesink location=%OUTPUT%
 
 @echo Done! Press enter to exit.
 PAUSE
