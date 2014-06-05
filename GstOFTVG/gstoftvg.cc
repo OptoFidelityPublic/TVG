@@ -27,7 +27,7 @@
  * <refsect2>
  * <title>Example launch line</title>
  * |[
- * gst-launch -v -m fakesrc ! oftvg ! autovideosink
+ * gst-launch -v videotestsrc ! oftvg location=layout.bmp ! autovideosink
  * ]|
  * </refsect2>
  */
@@ -57,12 +57,6 @@
 
 using namespace OFTVG;
 
-#if defined(_MSC_VER)
-#define Restrict __restrict
-#else
-#define Restrict restrict
-#endif
-
 GST_DEBUG_CATEGORY_STATIC (gst_oftvg_debug);
 #define GST_CAT_DEFAULT gst_oftvg_debug
 
@@ -90,7 +84,6 @@ enum
   PROP_CALIBRATION,
   PROP_NUMBUF,
   PROP_LOCATION,
-  PROP_REPEAT,
   PROP_SILENT,
   PROP_SEQUENCE,
 };
@@ -140,11 +133,6 @@ static void gst_oftvg_set_property (GObject * object, guint prop_id,
 static void gst_oftvg_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
 
-static gint64 gst_oftvg_source_frame_number(GstOFTVG* const filter,
-  const GstBuffer* const buf);
-
-static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event);
-
 static GstFlowReturn gst_oftvg_transform_ip (GstBaseTransform * base,
     GstBuffer * outbuf);
 
@@ -153,8 +141,6 @@ static gboolean gst_oftvg_set_caps(GstBaseTransform* btrans,
 
 static const GstOFTVGLayout&
   gst_oftvg_get_layout(const GstOFTVG* filter, const GstBuffer* buf);
-
-static gboolean gst_oftvg_set_process_function(GstOFTVG* filter);
 
 static gboolean gst_oftvg_start(GstBaseTransform* btrans);
 
@@ -213,11 +199,6 @@ gst_oftvg_class_init (GstOFTVGClass* klass)
       -1, G_MAXINT, DEFAULT_NUM_BUFFERS,
       (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
 
-  g_object_class_install_property(gobject_class, PROP_REPEAT,
-    g_param_spec_int ("repeat", "Repeat", "Repeat n times.",
-      1, G_MAXINT, DEFAULT_REPEAT,
-      (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
-
   g_object_class_install_property(gobject_class, PROP_SILENT,
     g_param_spec_boolean ("silent", "Silent", "Produce verbose output ?",
           FALSE, (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE)));
@@ -226,7 +207,6 @@ gst_oftvg_class_init (GstOFTVGClass* klass)
     g_param_spec_string ("sequence", "Custom color sequence", "Text file with custom color sequence data.",
       "", (GParamFlags)(G_PARAM_READWRITE)));
 
-  btrans->sink_event = GST_DEBUG_FUNCPTR(gst_oftvg_event);
   btrans->transform_ip = GST_DEBUG_FUNCPTR(gst_oftvg_transform_ip);
   btrans->set_caps     = GST_DEBUG_FUNCPTR(gst_oftvg_set_caps);
   btrans->start = GST_DEBUG_FUNCPTR(gst_oftvg_start);
@@ -244,7 +224,6 @@ static void gst_oftvg_init (GstOFTVG* filter)
   filter->oftvg.setElement(filter->element);
   filter->oftvg.setLayoutLocation(DEFAULT_LAYOUT_LOCATION);
   filter->oftvg.setCalibrationPrepend(DEFAULT_CALIBRATION_PREPEND);
-  filter->oftvg.setRepeat(DEFAULT_REPEAT);
   filter->oftvg.setNumBuffers(DEFAULT_NUM_BUFFERS);
   filter->oftvg.setCustomSequence("");
 
@@ -292,7 +271,6 @@ gst_oftvg_set_property (GObject * object, guint prop_id,
         if (g_ascii_strncasecmp(CALIBRATION_ONLY, str, strlen(CALIBRATION_ONLY)) == 0)
         {
           filter->oftvg.setNumBuffers(0);
-          filter->oftvg.setRepeat(0);
         }
       }
       break;
@@ -302,9 +280,6 @@ gst_oftvg_set_property (GObject * object, guint prop_id,
       break;
     case PROP_NUMBUF:
       filter->oftvg.setNumBuffers(g_value_get_int(value));
-      break;
-    case PROP_REPEAT:
-      filter->oftvg.setRepeat(g_value_get_int(value));
       break;
     case PROP_SILENT:
       filter->oftvg.setSilent(g_value_get_boolean(value)?true:false);
@@ -341,9 +316,6 @@ gst_oftvg_get_property (GObject * object, guint prop_id,
       break;
     case PROP_NUMBUF:
       g_value_set_int(value, filter->oftvg.getNumBuffers());
-      break;
-    case PROP_REPEAT:
-      g_value_set_int(value, filter->oftvg.getRepeat());
       break;
     case PROP_SILENT:
       g_value_set_boolean(value, filter->oftvg.getSilent());
@@ -395,63 +367,6 @@ static void gst_oftvg_process_ip_end_timing(GstOFTVG* filter,
 }
 
 /* GstBaseTransform vmethod implementations */
-
-static gboolean gst_oftvg_event(GstBaseTransform* base, GstEvent *event)
-{
-  GstOFTVG* filter = GST_OFTVG(base);
-  gboolean ret;
-
-  switch (GST_EVENT_TYPE(event))
-  {
-    case GST_EVENT_FLUSH_START:
-    case GST_EVENT_FLUSH_STOP:
-    case GST_EVENT_SEGMENT:
-      // Block the events related to the repeat seek from propagating downstream.
-      // We kind of split the pipeline in half: upstream seeks back to the start
-      // of video while downstream keeps going.
-      if (filter->oftvg.getRepeatCount() > 0)
-      {
-        // drop event
-		GST_INFO("Dropping event.");
-		gst_event_unref(event);
-        ret = TRUE;
-      }
-      else if (GST_EVENT_TYPE(event) == GST_EVENT_SEGMENT)
-      {
-        // Patch other SEGMENT events so that the end time is indeterminate.
-        // The default value is the length of the input video, but due to repeats
-        // our output may be longer.
-        // event = gst_event_new_segment(false, 1.0, GST_FORMAT_TIME, 0, -1, 0); TODO!
-		GST_INFO("Pushing event forward.");
-        ret = gst_pad_push_event (filter->element.srcpad, event);
-      }
-      break;
-    case GST_EVENT_EOS:
-      if (!filter->oftvg.atInputStreamEnd())
-      {
-        GST_ELEMENT_WARNING(filter, STREAM, FAILED,
-          ("Stream ended prematurely."), (NULL));
-      }
-      // Pass on.
-      ret = gst_pad_push_event (filter->element.srcpad, event);
-      break;
-/*
-    case GST_EVENT_CAPS:
-      GstCaps *caps;
-      gst_event_parse_caps (event, &caps);
-	  gst_pad_peer_query_caps (filter->element.srcpad, caps);
-	  gst_event_unref(event);
-	  ret = TRUE;
-	  
-      break;
-*/
-    default:
-      ret = gst_pad_push_event (filter->element.srcpad, event);
-      break;
-  }
-
-  return ret;
-}
 
 /// This function does the actual processing. In place processing.
 static GstFlowReturn

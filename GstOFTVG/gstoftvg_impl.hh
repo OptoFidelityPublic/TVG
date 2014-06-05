@@ -69,8 +69,6 @@ public:
   void setCalibrationAppend(bool value) { calibration_append = value; }
   int getNumBuffers() { return num_buffers; }
   void setNumBuffers(int value) { num_buffers = value; }
-  int getRepeat() { return repeat; }
-  void setRepeat(int value) { repeat = value; }
   const gchar* getLayoutLocation() { return layout_location; }
   void setLayoutLocation(const gchar* value) {
     g_free(layout_location);
@@ -85,9 +83,6 @@ public:
   }
 
   /* state */
-  /// Returns the repeat counter value. 0 = calibration frames.
-  /// 1 = first round.
-  int getRepeatCount() { return repeat_count; }
   /// Returns whether we are at the last frame to process from the input
   /// stream.
   bool atInputStreamEnd();
@@ -116,7 +111,6 @@ private:
   /// Report progress
   void report_progress(GstBuffer* buf);
 
-  GstFlowReturn repeatFromZero(GstBuffer* buf);
   GstFlowReturn handle_frame_numbers(GstBuffer* buf);
 
   const GstOFTVGLayout&
@@ -138,8 +132,8 @@ private:
 
   /* internal state */
   
-  /// Which round is it? 0 = calibration frames, 1 = first round, ...
-  int repeat_count;
+  enum {STATE_PRECALIBRATION, STATE_VIDEO, STATE_POSTCALIBRATION} state; 
+  
   /// Number of frames to process. If -1, the number is determined by
   /// the layout.
   int num_buffers;
@@ -153,9 +147,6 @@ private:
   /// Previously reported timestamp
   GstClockTime progress_timestamp;
 
-  /// Timestamp offset for repeating frames
-  GstClockTime timestamp_offset;
-  
   /// Frame count offset
   gint64 frame_offset;
 
@@ -167,9 +158,7 @@ private:
   /// Produce calibration frames in the beginning
   bool calibration_prepend;
   bool calibration_append;
-  /// Repeat first x frames n times.
-  int repeat;
-
+  
   /* processing function */
   typedef void (Oftvg::*ProcessInplaceFunc)(guint8* buf, int frame_number,
     const GstOFTVGLayout& layout);

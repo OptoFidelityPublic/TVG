@@ -88,7 +88,6 @@ Oftvg::Oftvg()
   filter->silent = FALSE;
   filter->layout_location = NULL;
   filter->calibration_prepend = false;
-  filter->repeat = 1;
   filter->num_buffers = -1;
   reset();
   DEBUG_INIT
@@ -98,11 +97,9 @@ void Oftvg::reset()
 {
   // Start with calibration frames (repeat_count = 0).
   Oftvg* filter = this;
-  filter->repeat_count = 0;
+  filter->state = STATE_PRECALIBRATION;
   filter->frame_counter = 0;
   filter->progress_timestamp = G_MININT64;
-  filter->timestamp_offset = 0;
-  filter->frame_offset = 0;
 }
 
 /////////
@@ -222,8 +219,7 @@ gint64 Oftvg::get_max_output_frame_number(const GstBuffer* buf)
   {
     calibration_frames += 200;
   }
-  return calibration_frames +
-    (get_max_frame_number() + 1) * filter->repeat;
+  return calibration_frames + filter->num_buffers;
 }
 
 static guint8 color_array_yuv[20][4] = {
@@ -403,103 +399,42 @@ void Oftvg::report_progress(GstBuffer* buf)
 
 /* Frame number, repeat, calibration frames */
 
-GstFlowReturn Oftvg::repeatFromZero(GstBuffer* buf)
-{
-  Oftvg* filter = this;
-  gint64 frame_number = input_frame_number(buf);
-
-  GST_DEBUG("gstoftvg: repeat\n");
-
-  // Seek the stream
-  gint64 seek_pos = 0;
-  if (!gst_element_seek(&filter->element().element, 1.0, GST_FORMAT_TIME,
-          (GstSeekFlags) (GST_SEEK_FLAG_FLUSH|GST_SEEK_FLAG_ACCURATE),
-          GST_SEEK_TYPE_SET, seek_pos, GST_SEEK_TYPE_NONE, 0))
-  {
-    GST_ELEMENT_ERROR(&filter->element(), STREAM, FAILED, (NULL),
-      ("gstoftvg: seek"));
-    return GST_FLOW_ERROR;
-  }
-
-  // Keep the timestamps we output sequential.
-  filter->timestamp_offset =
-    GST_BUFFER_TIMESTAMP(buf) + GST_BUFFER_DURATION(buf);
-  filter->frame_offset =
-    output_frame_number(frame_number) + 1;
-
-  frame_counter_init(0);
-  return GST_FLOW_OK;
-}
-
 GstFlowReturn Oftvg::handle_frame_numbers(GstBuffer* buf)
 {
   Oftvg* filter = this;
   gint64 frame_number = input_frame_number(buf);
-  gint64 max_frame_number = get_max_frame_number();
   
   report_progress(buf);
 
-  if (filter->repeat_count == 0 && !filter->calibration_prepend)
+  if (filter->state == STATE_PRECALIBRATION)
   {
-    // There was no prepend calibration frames.
-    filter->repeat_count++;
-  }
-  else if (filter->repeat_count == filter->repeat + 1 && !filter->calibration_append)
-  {
-    // There was no append calibration frames.
-    filter->repeat_count++;
-  }
-  else if (filter->repeat_count == 0)
-  {
-    // Calibration frames. No frame limit. Just time limit.
-    max_frame_number = G_MAXINT64;
     GstClockTime ts = calibrationTimestamps[numCalibrationTimestamps-1];
-    if (GST_BUFFER_PTS(buf) + GST_BUFFER_DURATION(buf) >= ts)
+    if (!filter->calibration_prepend ||
+        GST_BUFFER_PTS(buf) + GST_BUFFER_DURATION(buf) >= ts)
     {
-      filter->repeat_count++;
-	  GST_INFO("Repeat 0");
-      return repeatFromZero(buf);
+      filter->state = STATE_VIDEO;
     }
   }
-  else if (filter->repeat_count == filter->repeat + 1)
+  else if (filter->state == STATE_VIDEO)
   {
-    max_frame_number = 200;
-  }
-
-  if (frame_number >= max_frame_number
-    && filter->repeat_count < filter->repeat + (filter->calibration_append ? 1 : 0))
-  {
-    filter->repeat_count++;
-	GST_INFO("Repeating 1");
-    return repeatFromZero(buf);
-  }
-
-  if ((frame_number > max_frame_number)
-    || filter->repeat_count > filter->repeat + 1)
-  {
-	GST_INFO("Stopping... %ld/%ld, %d/%d", frame_number, max_frame_number, filter->repeat_count, filter->repeat);
-
-    // Enough frames have been processed.
-    if (!filter->silent)
+    if (frame_number > filter->num_buffers)
     {
-      g_print("gstoftvg: Enough frames have been processed: %d x %d.\n",
-        filter->repeat_count, (int) frame_number);
+      if (!filter->silent)
+      {
+	g_print("gstoftvg: Enough frames have been processed: %d.\n", (int) frame_number);
+      }
+      filter->state = STATE_POSTCALIBRATION;
     }
-
-    /*
-    "It is important to note that only elements driving the pipeline should ever
-    send an EOS event. If your element is chain-based, it is not driving the
-    pipeline. Chain-based elements should just return GST_FLOW_UNEXPECTED from
-    their chain function at the end of the stream (or the configured segment),
-    the upstream element that is driving the pipeline will then take care of
-    sending the EOS event (or alternatively post a SEGMENT_DONE message on the
-    bus depending on the mode of operation)."
-    http://gstreamer.freedesktop.org/data/doc/gstreamer/head/pwg/html/section-events-definitions.html
-    */
-    //gst_pad_push_event(filter->element().srcpad, gst_event_new_eos());
-    return GST_FLOW_EOS;
   }
-
+  else if (filter->state == STATE_POSTCALIBRATION)
+  {
+    if (frame_number > filter->num_buffers)
+    {
+      /* Everything done */
+      return GST_FLOW_EOS;
+    }
+  }
+ 
   frame_counter_advance();
 
   return GST_FLOW_OK;
@@ -509,10 +444,8 @@ const GstOFTVGLayout&
   Oftvg::get_layout(const GstBuffer* buf)
 {
   const Oftvg* filter = this;
-  // Default
-  const GstOFTVGLayout* layout = &(filter->layout);
-
-  if (filter->calibration_prepend)
+  
+  if (filter->state == STATE_PRECALIBRATION)
   {
     GstClockTime dest_timestamp = GST_BUFFER_TIMESTAMP(buf);
     int i;
@@ -521,18 +454,21 @@ const GstOFTVGLayout&
       GstClockTime timestamp = calibrationTimestamps[i];
       if (dest_timestamp < timestamp)
       {
-        layout = &(filter->calibration_layouts[i]);
-        break;
+        return filter->calibration_layouts[i];
       }
     }
   }
-
-  if (filter->calibration_append && filter->repeat_count == filter->repeat + 1)
+  else if (filter->state == STATE_VIDEO)
   {
-    layout = &(filter->calibration_layouts[0]);
+    return filter->layout;
   }
-
-  return *layout;
+  else if (filter->state == STATE_POSTCALIBRATION)
+  {
+    return filter->calibration_layouts[0];
+  }
+  
+  /* Not reached */
+  g_assert_not_reached();
 }
 
 
@@ -542,7 +478,6 @@ GstFlowReturn Oftvg::gst_oftvg_transform_ip(GstBuffer *buf)
 {
   Oftvg *filter = this;
 
-  GST_BUFFER_TIMESTAMP(buf) += filter->timestamp_offset;
   GstFlowReturn ret = handle_frame_numbers(buf);
 
   if (ret == GST_FLOW_OK)
