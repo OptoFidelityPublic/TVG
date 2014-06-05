@@ -139,9 +139,6 @@ static GstFlowReturn gst_oftvg_transform_ip (GstBaseTransform * base,
 static gboolean gst_oftvg_set_caps(GstBaseTransform* btrans,
   GstCaps* incaps, GstCaps* outcaps);
 
-static const GstOFTVGLayout&
-  gst_oftvg_get_layout(const GstOFTVG* filter, const GstBuffer* buf);
-
 static gboolean gst_oftvg_start(GstBaseTransform* btrans);
 
 /* entry point to initialize the plug-in
@@ -154,12 +151,6 @@ gboolean oftvg_init (GstPlugin* oftvg)
 }
 
 /* GObject vmethod implementations */
-
-static void
-gst_oftvg_base_init (gpointer klass)
-{
-  GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
-}
 
 /* initialize the oftvg's class */
 static void
@@ -330,10 +321,6 @@ gst_oftvg_get_property (GObject * object, guint prop_id,
 }
 
 /* timing helpers */
-static void gst_oftvg_process_ip_begin_timing(GstOFTVG* filter)
-{
-}
-
 static void gst_oftvg_process_ip_end_timing(GstOFTVG* filter,
   timemeasure_t timer1)
 {
@@ -390,7 +377,7 @@ gst_oftvg_transform_ip(GstBaseTransform* base, GstBuffer *buf)
 static gboolean gst_oftvg_set_caps(GstBaseTransform* object,
   GstCaps* incaps, GstCaps* outcaps)
 {
-  /* unused parameter */ outcaps;
+  (void)outcaps;
   GstOFTVG *filter = GST_OFTVG(object);
 
   if (!filter->oftvg.videoFormatSetCaps(incaps))

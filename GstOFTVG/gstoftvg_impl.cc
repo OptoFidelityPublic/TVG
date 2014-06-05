@@ -82,7 +82,7 @@ static int gst_oftvg_get_subsampling_v_shift(GstVideoInfo *info,
   int component, int height);
 
 Oftvg::Oftvg()
-  : layout(), calibration_layouts()
+  : calibration_layouts(), layout()
 {
   Oftvg* filter = this;
   filter->silent = FALSE;
@@ -122,7 +122,6 @@ bool Oftvg::videoFormatSetCaps(GstCaps* incaps)
 
 bool Oftvg::initParams()
 {
-  Oftvg* filter = this;
   init_colorspace();
   init_sequence();
   init_layout();
@@ -246,8 +245,6 @@ static guint8 color_array_rgb[20][4] = {
 
 void Oftvg::init_colorspace()
 {
-  Oftvg* filter = this;
-
   if (GST_VIDEO_FORMAT_INFO_IS_YUV(in_format_info))
   {
     color_array_ = color_array_yuv;
@@ -274,7 +271,7 @@ void Oftvg::init_layout()
   filter->layout.clear();
   filter->calibration_layouts.clear();
 
-  for (int i = 0; i < sizeof(calibrationModes)/sizeof(calibrationModes[0]); ++i)
+  for (size_t i = 0; i < sizeof(calibrationModes)/sizeof(calibrationModes[0]); ++i)
   {
     GstOFTVGLayout new_layout;
     OFTVG::OverlayMode mode = calibrationModes[i];

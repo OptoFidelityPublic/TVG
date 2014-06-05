@@ -66,6 +66,9 @@ static inline double end_timing(timemeasure_t timer, const char *name)
 {
     double result = 0.0;
 
+    (void)name;
+    (void)timer;
+    
 #ifdef DO_TIMING
 #ifdef _WIN32
     LONGLONG start = timer;
