@@ -141,15 +141,6 @@ static gboolean gst_oftvg_set_caps(GstBaseTransform* btrans,
 
 static gboolean gst_oftvg_start(GstBaseTransform* btrans);
 
-/* entry point to initialize the plug-in
- * initialize the plug-in itself
- * register the element factories and other features
- */
-gboolean oftvg_init (GstPlugin* oftvg)
-{
-  return gst_element_register (oftvg, "oftvg", GST_RANK_NONE, GST_TYPE_OFTVG);
-}
-
 /* GObject vmethod implementations */
 
 /* initialize the oftvg's class */
@@ -395,22 +386,3 @@ static gboolean gst_oftvg_set_caps(GstBaseTransform* object,
 
   return TRUE;
 }
-
-
-#ifndef PACKAGE
-#define PACKAGE "gstoftvg"
-#endif
-
-/* gstreamer looks for this structure to register oftvgs
- */
-GST_PLUGIN_DEFINE (
-    GST_VERSION_MAJOR,
-    GST_VERSION_MINOR,
-    oftvg,
-    "OptoFidelity Test Video Generator",
-    oftvg_init,
-    "Compiled " __DATE__ " " __TIME__,
-    "LGPL",
-    "OptoFidelity",
-    "http://optofidelity.com/"
-)

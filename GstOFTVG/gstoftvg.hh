@@ -25,8 +25,6 @@
 #ifndef __GST_OFTVG_HH__
 #define __GST_OFTVG_HH__
 
-#include <vector>
-
 #include <gst/gst.h>
 #include <gst/video/video.h>
 #include <gst/base/gstbasetransform.h>
