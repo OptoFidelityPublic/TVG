@@ -39,6 +39,7 @@
 
 #include <gst/gst.h>
 #include "gstoftvg_video.hh"
+#include "gstoftvg_video_process.hh"
 
 /* Debug category to use */
 GST_DEBUG_CATEGORY_EXTERN(gst_oftvg_debug);
@@ -109,9 +110,10 @@ G_DEFINE_TYPE (GstOFTVG_Video, gst_oftvg_video, GST_TYPE_BASE_TRANSFORM);
 /* Prototypes for the overridden methods */
 static void gst_oftvg_video_set_property (GObject * object, guint prop_id, const GValue * value, GParamSpec * pspec);
 static void gst_oftvg_video_get_property (GObject * object, guint prop_id, GValue * value, GParamSpec * pspec);
-static GstFlowReturn gst_oftvg_video_transform_ip (GstBaseTransform * base, GstBuffer * outbuf);
-static gboolean gst_oftvg_video_set_caps(GstBaseTransform* btrans, GstCaps* incaps, GstCaps* outcaps);
 static gboolean gst_oftvg_video_start(GstBaseTransform* btrans);
+static gboolean gst_oftvg_video_sink_event(GstBaseTransform *object, GstEvent *event);
+static gboolean gst_oftvg_video_set_caps(GstBaseTransform* btrans, GstCaps* incaps, GstCaps* outcaps);
+static GstFlowReturn gst_oftvg_video_transform_ip (GstBaseTransform * base, GstBuffer * outbuf);
 
 /* Initializer for the class type */
 static void gst_oftvg_video_class_init (GstOFTVG_VideoClass * klass)
@@ -131,6 +133,7 @@ static void gst_oftvg_video_class_init (GstOFTVG_VideoClass * klass)
     btrans->transform_ip = GST_DEBUG_FUNCPTR(gst_oftvg_video_transform_ip);
     btrans->set_caps     = GST_DEBUG_FUNCPTR(gst_oftvg_video_set_caps);
     btrans->start        = GST_DEBUG_FUNCPTR(gst_oftvg_video_start);
+    btrans->sink_event   = GST_DEBUG_FUNCPTR(gst_oftvg_video_sink_event);
   }
   
   /* Element metadata */
@@ -230,6 +233,22 @@ GSTOFTVG_VIDEO_PROPERTIES
 /* Called when the pipeline is starting up */
 static gboolean gst_oftvg_video_start(GstBaseTransform* object)
 {
+  GstOFTVG_Video *filter = GST_OFTVG_VIDEO(object);
+  filter->frame_counter = 0;
+  filter->last_state_change = G_MININT64;
+  filter->end_of_video = G_MAXINT64;
+  filter->progress_timestamp = G_MININT64;
+  filter->process = new OFTVG_Video_Process();
+  
+  if (g_strcmp0(filter->calibration, "off") == 0)
+  {
+    filter->state = STATE_VIDEO;
+  }
+  else
+  {
+    filter->state = STATE_PRECALIBRATION_WHITE;
+  }
+  
   return true;
 }
 
@@ -237,25 +256,156 @@ static gboolean gst_oftvg_video_start(GstBaseTransform* object)
 static gboolean gst_oftvg_video_set_caps(GstBaseTransform* object, GstCaps* incaps, GstCaps* outcaps)
 {
   GstOFTVG_Video *filter = GST_OFTVG_VIDEO(object);
-  (void)outcaps;
-
-  gst_video_info_init(&filter->in_info);
-  if (!gst_caps_is_fixed(incaps) || !gst_video_info_from_caps(&filter->in_info, incaps))
-  {
-    GST_WARNING_OBJECT(filter, "Could not get video info");
-    return FALSE;
-  }
-
-  filter->in_format = GST_VIDEO_INFO_FORMAT(&filter->in_info);
-  filter->in_format_info = gst_video_format_get_info(filter->in_format);
-  filter->width = GST_VIDEO_INFO_WIDTH(&filter->in_info);
-  filter->height = GST_VIDEO_INFO_HEIGHT(&filter->in_info);
-  return TRUE;
+  (void)outcaps; /* unused */
+  
+  if (!filter->process->init_caps(incaps))
+    return false;
+  
+  if (!filter->process->init_custom_sequence(filter->sequence))
+    return false;
+  
+  if (!filter->process->init_layout(filter->location))
+    return false;
+  
+  return true;
 }
 
-/* Entry point for processing video frames */
+/* Events on the sink pin */
+static gboolean gst_oftvg_video_sink_event(GstBaseTransform *object, GstEvent *event)
+{
+  GstOFTVG_Video *filter = GST_OFTVG_VIDEO(object);
+  
+  if (GST_EVENT_TYPE(event) == GST_EVENT_SEGMENT)
+  {
+    /* Take note of the end time of the video, if known */
+    const GstSegment *segment;
+    gst_event_parse_segment(event, &segment);
+    
+    if (segment->format == GST_FORMAT_TIME)
+    {
+      if (segment->stop > 0)
+      {
+        filter->end_of_video = segment->stop;
+      }
+    }
+  }
+  else if (GST_EVENT_TYPE(event) == GST_EVENT_EOS)
+  {
+    /* If post-calibration was requested, make sure that it was done. */
+    if (filter->state != STATE_END && g_strcmp0(filter->calibration, "both") == 0)
+    {
+      GST_ERROR("Stream ended unexpectedly, is num_buffers too large?");
+    }
+  }
+  
+  return gst_pad_push_event (filter->element.srcpad, event);
+}
+
+/* Process a single video frame in-place */
 static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstBuffer *buf)
 {
+  GstOFTVG_Video *filter = GST_OFTVG_VIDEO(object);
+  GstClockTime buffer_end_time = GST_BUFFER_PTS(buf) + GST_BUFFER_DURATION(buf);
+  state_t prev_state = filter->state;
+  
+  if (!filter->silent && filter->state == STATE_VIDEO)
+  {
+    /* Show progress once a second */
+    if (buffer_end_time / GST_SECOND - filter->progress_timestamp / GST_SECOND != 0)
+    {
+      float progress = 0;
+      if (filter->num_buffers > 0)
+      {
+        progress = 100.0f * filter->frame_counter / filter->num_buffers;
+      }
+      else
+      {
+        progress = 100.0f * buffer_end_time / filter->end_of_video;
+      }
+      
+      filter->progress_timestamp = buffer_end_time;
+      g_print("Progress: %4.1f%% (%d seconds) complete\n", progress,
+              (int)((buffer_end_time - filter->last_state_change) / GST_SECOND));
+    }
+  }
+  
+  if (filter->state == STATE_PRECALIBRATION_WHITE)
+  {
+    filter->process->process_calibration_white(buf);
+    
+    if (buffer_end_time >= 4 * GST_SECOND)
+    {
+      filter->state = STATE_PRECALIBRATION_MARKS;
+    }
+  }
+  else if (filter->state == STATE_PRECALIBRATION_MARKS)
+  {
+    filter->process->process_calibration_marks(buf);
+    
+    if (buffer_end_time >= 5 * GST_SECOND)
+    {
+      if (g_strcmp0(filter->calibration, "only") == 0)
+      {
+        filter->state = STATE_END;
+      }
+      else
+      {
+        filter->state = STATE_VIDEO;
+      }
+    }
+  }
+  else if (filter->state == STATE_VIDEO)
+  {
+    filter->process->process_frame(buf, filter->frame_counter);
+    filter->frame_counter++;
+    
+    if (filter->num_buffers > 0)
+    {
+      /* Easy case: a fixed number of buffers */
+      if (filter->frame_counter >= filter->num_buffers)
+      {
+        if (g_strcmp0(filter->calibration, "both") == 0)
+        {
+          filter->state = STATE_POSTCALIBRATION;
+        }
+        else
+        {
+          filter->state = STATE_END;
+        }
+      }
+    }
+    else
+    {
+      /* Otherwise try to stop earlier to leave enough time for postcalibration */
+      if (g_strcmp0(filter->calibration, "both") == 0)
+      {
+        if (buffer_end_time + 6 * GST_SECOND >= filter->end_of_video)
+        {
+          filter->state = STATE_POSTCALIBRATION;
+        }
+      }
+    }
+  }
+  else if (filter->state == STATE_POSTCALIBRATION)
+  {
+    filter->process->process_calibration_white(buf);
+    
+    if (buffer_end_time - filter->last_state_change >= 5 * GST_SECOND)
+    {
+      filter->state = STATE_END;
+    }
+  }
+  else if (filter->state == STATE_END)
+  {
+    /* Note that the current buffer will not be passed forward when we return EOS */
+    return GST_FLOW_EOS;
+  }
+  
+  if (filter->state != prev_state)
+  {
+    filter->last_state_change = buffer_end_time;
+  }
+  
   return GST_FLOW_OK;
 }
 

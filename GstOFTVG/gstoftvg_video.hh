@@ -56,20 +56,41 @@ G_BEGIN_DECLS
 typedef struct _GstOFTVG_Video      GstOFTVG_Video;
 typedef struct _GstOFTVG_VideoClass GstOFTVG_VideoClass;
 
+#ifdef __cplusplus
+class OFTVG_Video_Process;
+#else
+typedef struct OFTVG_Video_Process OFTVG_Video_Process;
+#endif
+
+enum state_t {STATE_PRECALIBRATION_WHITE, STATE_PRECALIBRATION_MARKS,
+              STATE_VIDEO, STATE_POSTCALIBRATION, STATE_END};
+
 /* Structure to contain the internal data of gstoftvg_video elements */
 struct _GstOFTVG_Video
 {
   GstBaseTransform element;
   GstPad *sinkpad, *srcpad;
   
-  /* Filled in by set_caps() */
-  GstVideoInfo in_info;
-  GstVideoFormatInfo const *in_format_info;
-  GstVideoFormat in_format;
-  int width;
-  int height;
+  /* Current state of filter */
+  enum state_t state;
   
+  /* Count of frames processed so far in STATE_VIDEO.
+   * Used as the frame id (starts from 0). */
+  int frame_counter;
   
+  /* Timestamp of last state change */
+  GstClockTime last_state_change;
+  
+  /* End time of the video, if known */
+  GstClockTime end_of_video;
+  
+  /* Last time a progress report was printed. */
+  GstClockTime progress_timestamp;
+  
+  /* This is the actual class that does the processing */
+  OFTVG_Video_Process* process;
+  
+  /* Storage for element properties */
 #define PROP_STR(up,name,desc,def) gchar *name;
 #define PROP_INT(up,name,desc,def) gint name;
 #define PROP_BOOL(up,name,desc,def) gboolean name;
