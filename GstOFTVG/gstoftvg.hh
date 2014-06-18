@@ -18,19 +18,12 @@
  * Boston, MA 02111-1307, USA.
  */
 
-/**
- * Private declarations for GstOFTVG element.
- */
-
 #ifndef __GST_OFTVG_HH__
 #define __GST_OFTVG_HH__
 
 #include <gst/gst.h>
-#include <gst/video/video.h>
-#include <gst/base/gstbasetransform.h>
-
-#include "gstoftvg_impl.hh"
-#include "gstoftvg_layout.hh"
+#include <gst/gstbin.h>
+#include "gstoftvg_video.hh"
 
 G_BEGIN_DECLS
 
@@ -49,12 +42,12 @@ typedef struct _GstOFTVG      GstOFTVG;
 typedef struct _GstOFTVGClass GstOFTVGClass;
 
 struct _GstOFTVG {
-  GstBaseTransform element;
-  OFTVG::Oftvg oftvg;
+  GstBin bin;
+  GstOFTVG_Video *video_element;
 };
 
 struct _GstOFTVGClass {
-  GstBaseTransformClass parent_class;
+  GstBinClass parent_class;
 };
 
 GType gst_oftvg_get_type (void);

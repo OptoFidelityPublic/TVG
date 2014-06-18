@@ -1,7 +1,7 @@
 oftvg_LTLIBRARIES = libgstoftvg.la
 
 libgstoftvg_la_SOURCES = plugin_main.c \
-	gstoftvg.cc gstoftvg_impl.cc gstoftvg_layout.cc \
+	gstoftvg.cc gstoftvg_layout.cc \
 	gstoftvg_pixbuf.cc gstoftvg_video.cc gstoftvg_video_process.cc
 
 WFLAGS = -Wall -Wextra
