@@ -102,22 +102,24 @@ bool OFTVG_Video_Process::init_layout(const gchar* layout_file)
   // Load the main layout
   {
     layout_normal.clear();
-    ret &= gst_oftvg_load_layout_bitmap(layout_file, &error, &layout_normal, width, height,
-                                        OFTVG::OVERLAY_MODE_DEFAULT, custom_sequence);
+    ret = gst_oftvg_load_layout_bitmap(layout_file, &error, &layout_normal, width, height,
+                                       OFTVG::OVERLAY_MODE_DEFAULT, custom_sequence);
   }
   
   // Load the all-white calibration layout
+  if (ret)
   {
     layout_calibration_white.clear();
-    ret &= gst_oftvg_load_layout_bitmap(layout_file, &error, &layout_calibration_white, width, height,
-                                        OFTVG::OVERLAY_MODE_WHITE, custom_sequence);
+    ret = gst_oftvg_load_layout_bitmap(layout_file, &error, &layout_calibration_white, width, height,
+                                       OFTVG::OVERLAY_MODE_WHITE, custom_sequence);
   }
   
   // Load the black marks on white background calibration layout
+  if (ret)
   {
     layout_calibration_marks.clear();
-    ret &= gst_oftvg_load_layout_bitmap(layout_file, &error, &layout_calibration_marks, width, height,
-                                        OFTVG::OVERLAY_MODE_CALIBRATION, custom_sequence);
+    ret = gst_oftvg_load_layout_bitmap(layout_file, &error, &layout_calibration_marks, width, height,
+                                       OFTVG::OVERLAY_MODE_CALIBRATION, custom_sequence);
   }
   
   if (!ret)

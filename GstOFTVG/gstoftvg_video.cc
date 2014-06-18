@@ -259,13 +259,24 @@ static gboolean gst_oftvg_video_set_caps(GstBaseTransform* object, GstCaps* inca
   (void)outcaps; /* unused */
   
   if (!filter->process->init_caps(incaps))
+  {
+    GST_ELEMENT_ERROR(filter, STREAM, FORMAT, ("Failed to apply caps"), (NULL));
     return false;
+  }
   
   if (!filter->process->init_custom_sequence(filter->sequence))
+  {
+    GST_ELEMENT_ERROR(filter, RESOURCE, NOT_FOUND,
+                      ("Failed to load custom sequence %s", filter->sequence), (NULL));
     return false;
+  }
   
   if (!filter->process->init_layout(filter->location))
+  {
+    GST_ELEMENT_ERROR(filter, RESOURCE, NOT_FOUND,
+                      ("Failed to load layout %s", filter->location), (NULL));
     return false;
+  }
   
   return true;
 }
@@ -294,7 +305,10 @@ static gboolean gst_oftvg_video_sink_event(GstBaseTransform *object, GstEvent *e
     /* If post-calibration was requested, make sure that it was done. */
     if (filter->state != STATE_END && g_strcmp0(filter->calibration, "both") == 0)
     {
-      GST_ERROR("Stream ended unexpectedly, is num_buffers too large?");
+      GST_ELEMENT_WARNING(filter, STREAM, FAILED,
+                          ("Stream ended unexpectedly, is num_buffers too large?"
+                           " (num_buffers = %d, stream contains %d frames)",
+                           filter->num_buffers, filter->frame_counter), (NULL));
     }
   }
   
@@ -329,6 +343,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
     }
   }
   
+  /* State machine for the calibration/video parts */
   if (filter->state == STATE_PRECALIBRATION_WHITE)
   {
     filter->process->process_calibration_white(buf);
@@ -346,10 +361,12 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
     {
       if (g_strcmp0(filter->calibration, "only") == 0)
       {
+        GST_DEBUG("Calibration=only is done");
         filter->state = STATE_END;
       }
       else
       {
+        GST_DEBUG("Precalibration is done");
         filter->state = STATE_VIDEO;
       }
     }
@@ -366,10 +383,12 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
       {
         if (g_strcmp0(filter->calibration, "both") == 0)
         {
+          GST_DEBUG("Given number of frames processed, going into postcalibration");
           filter->state = STATE_POSTCALIBRATION;
         }
         else
         {
+          GST_DEBUG("Given number of frames processed, video ends");
           filter->state = STATE_END;
         }
       }
@@ -377,10 +396,11 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
     else
     {
       /* Otherwise try to stop earlier to leave enough time for postcalibration */
-      if (g_strcmp0(filter->calibration, "both") == 0)
+      if (buffer_end_time + 6 * GST_SECOND >= filter->end_of_video)
       {
-        if (buffer_end_time + 6 * GST_SECOND >= filter->end_of_video)
+        if (g_strcmp0(filter->calibration, "both") == 0)
         {
+          GST_DEBUG("Close to end of video, going into postcalibration");
           filter->state = STATE_POSTCALIBRATION;
         }
       }
