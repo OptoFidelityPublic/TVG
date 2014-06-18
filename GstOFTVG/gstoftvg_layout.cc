@@ -44,7 +44,7 @@ GstOFTVGElement_FrameID::GstOFTVGElement_FrameID(int x, int y, int width, int he
 
 }
 
-OFTVG::MarkColor GstOFTVGElement_FrameID::getColor(int frameNumber) const
+OFTVG::MarkColor GstOFTVGElement_FrameID::getColor(int frameNumber, OFTVG::FrameFlags flags) const
 {
   if (frameNumber & (1 << (frameid_ - 1)))
     return OFTVG::MARKCOLOR_WHITE;
@@ -65,7 +65,7 @@ GstOFTVGElement_SyncMark::GstOFTVGElement_SyncMark(int x, int y, int width, int 
 
 }
 
-OFTVG::MarkColor GstOFTVGElement_SyncMark::getColor(int frameNumber) const
+OFTVG::MarkColor GstOFTVGElement_SyncMark::getColor(int frameNumber, OFTVG::FrameFlags flags) const
 {
   if (syncidx_ == 1)
   {
@@ -86,6 +86,9 @@ OFTVG::MarkColor GstOFTVGElement_SyncMark::getColor(int frameNumber) const
   else if (syncidx_ == 3)
   {
     // 6-color sync marker
+    if (flags & OFTVG::FRAMEFLAGS_LIPSYNC)
+      return OFTVG::MARKCOLOR_BLACK;
+    
     const OFTVG::MarkColor sequence[6] =
       {OFTVG::MARKCOLOR_RED, OFTVG::MARKCOLOR_YELLOW, OFTVG::MARKCOLOR_GREEN,
        OFTVG::MARKCOLOR_CYAN, OFTVG::MARKCOLOR_BLUE, OFTVG::MARKCOLOR_PURPLE};
@@ -101,7 +104,7 @@ OFTVG::MarkColor GstOFTVGElement_SyncMark::getColor(int frameNumber) const
   else if (syncidx_ == 5)
   {
     // Custom color sequence
-    if (frameNumber < customseq_.size())
+    if (frameNumber < (int)customseq_.size())
       return customseq_.at(frameNumber);
     else if (customseq_.size() > 0)
       return customseq_.at(customseq_.size() - 1);
@@ -127,7 +130,7 @@ GstOFTVGElement_Constant::GstOFTVGElement_Constant(int x, int y, int width, int 
 
 }
 
-OFTVG::MarkColor GstOFTVGElement_Constant::getColor(int frameNumber) const
+OFTVG::MarkColor GstOFTVGElement_Constant::getColor(int frameNumber, OFTVG::FrameFlags flags) const
 {
   return color_;
 }

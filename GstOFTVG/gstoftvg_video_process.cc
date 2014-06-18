@@ -133,19 +133,19 @@ bool OFTVG_Video_Process::init_layout(const gchar* layout_file)
 // Process a fully white calibration frame
 void OFTVG_Video_Process::process_calibration_white(GstBuffer *buf)
 {
-  process_with_layout(buf, &layout_calibration_white, 0);
+  process_with_layout(buf, &layout_calibration_white, 0, OFTVG::FRAMEFLAGS_NONE);
 }
 
 // Process a calibration frame with the frame ids in black.
 void OFTVG_Video_Process::process_calibration_marks(GstBuffer *buf)
 {
-  process_with_layout(buf, &layout_calibration_marks, 0);
+  process_with_layout(buf, &layout_calibration_marks, 0, OFTVG::FRAMEFLAGS_NONE);
 }
 
 // Process a normal video frame, based on frame index
-void OFTVG_Video_Process::process_frame(GstBuffer *buf, int frame_index)
+void OFTVG_Video_Process::process_frame(GstBuffer *buf, int frame_index, OFTVG::FrameFlags flags)
 {
-  process_with_layout(buf, &layout_normal, frame_index);
+  process_with_layout(buf, &layout_normal, frame_index, flags);
 }
 
 // Computes integer logarithm in base-2
@@ -206,7 +206,8 @@ static guint8 color_array_rgb[20][4] = {
 };
 
 // Process a frame with the defined layout and frame index
-void OFTVG_Video_Process::process_with_layout(GstBuffer *buf, GstOFTVGLayout *layout, int frame_index)
+void OFTVG_Video_Process::process_with_layout(GstBuffer *buf, GstOFTVGLayout *layout,
+                                              int frame_index, OFTVG::FrameFlags flags)
 {
   /* Map the buffer data to memory */
   GstMapInfo mapinfo;
@@ -239,7 +240,7 @@ void OFTVG_Video_Process::process_with_layout(GstBuffer *buf, GstOFTVGLayout *la
     const GstOFTVGElement& element = *layout->at(i);
 
     /* Get color of the marker for this frame */
-    OFTVG::MarkColor markcolor = element.getColor(frame_index);
+    OFTVG::MarkColor markcolor = element.getColor(frame_index, flags);
     
     if (markcolor == OFTVG::MARKCOLOR_TRANSPARENT)
       continue;

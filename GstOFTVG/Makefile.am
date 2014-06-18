@@ -4,7 +4,7 @@ libgstoftvg_la_SOURCES = plugin_main.c \
 	gstoftvg.cc gstoftvg_layout.cc \
 	gstoftvg_pixbuf.cc gstoftvg_video.cc gstoftvg_video_process.cc
 
-WFLAGS = -Wall -Wextra
+WFLAGS = -Wall -Wextra -Wno-unused-parameter
 libgstoftvg_la_CFLAGS = $(GST_CFLAGS) $(GDK_CFLAGS) $(WFLAGS)
 libgstoftvg_la_CXXFLAGS = $(GST_CFLAGS) $(GDK_CFLAGS) $(WFLAGS)
 libgstoftvg_la_LIBADD = $(GST_LIBS) $(GDK_LIBS)

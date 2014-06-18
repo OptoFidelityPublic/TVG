@@ -32,10 +32,10 @@ public:
   void process_calibration_marks(GstBuffer *buf);
   
   // Process a normal video frame, based on frame index
-  void process_frame(GstBuffer *buf, int frame_index);
+  void process_frame(GstBuffer *buf, int frame_index, OFTVG::FrameFlags flags);
 
   // Process a frame with the defined layout and frame index
-  void process_with_layout(GstBuffer *buf, GstOFTVGLayout *layout, int frame_index);
+  void process_with_layout(GstBuffer *buf, GstOFTVGLayout *layout, int frame_index, OFTVG::FrameFlags flags);
   
 private:
   GstOFTVGLayout layout_calibration_white;

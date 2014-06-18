@@ -58,6 +58,12 @@ namespace OFTVG
     MARKCOLOR_WHITE = 7,
     MARKCOLOR_TRANSPARENT
   };
+  
+  enum FrameFlags
+  {
+    FRAMEFLAGS_NONE = 0,
+    FRAMEFLAGS_LIPSYNC = 1
+  };
 };
 
 class GstOFTVGLayout;
@@ -76,7 +82,7 @@ public:
   inline const int& height() const { return height_; }
 
   /// Get the color of this marker in the given frame
-  virtual OFTVG::MarkColor getColor(int frameNumber) const = 0;
+  virtual OFTVG::MarkColor getColor(int frameNumber, OFTVG::FrameFlags flags) const = 0;
 
   /// Returns whether the properties apart from location and
   /// size equal to element b.
@@ -99,7 +105,7 @@ class GstOFTVGElement_FrameID: public GstOFTVGElement
 {
 public:
   GstOFTVGElement_FrameID(int x, int y, int width, int height, int frameid_n);
-  virtual OFTVG::MarkColor getColor(int frameNumber) const;
+  virtual OFTVG::MarkColor getColor(int frameNumber, OFTVG::FrameFlags flags) const;
   virtual bool propertiesEqual(const GstOFTVGElement &b) const;
   virtual inline GstOFTVGElement *copy() const { return new GstOFTVGElement_FrameID(*this); }
   
@@ -113,7 +119,7 @@ class GstOFTVGElement_SyncMark: public GstOFTVGElement
 {
 public:
   GstOFTVGElement_SyncMark(int x, int y, int width, int height, int syncidx, const std::vector<OFTVG::MarkColor> &customseq);
-  virtual OFTVG::MarkColor getColor(int frameNumber) const;
+  virtual OFTVG::MarkColor getColor(int frameNumber, OFTVG::FrameFlags flags) const;
   virtual bool propertiesEqual(const GstOFTVGElement &b) const;
   virtual inline GstOFTVGElement *copy() const { return new GstOFTVGElement_SyncMark(*this); }
   
@@ -127,7 +133,7 @@ class GstOFTVGElement_Constant: public GstOFTVGElement
 {
 public:
   GstOFTVGElement_Constant(int x, int y, int width, int height, OFTVG::MarkColor color);
-  virtual OFTVG::MarkColor getColor(int frameNumber) const;
+  virtual OFTVG::MarkColor getColor(int frameNumber, OFTVG::FrameFlags flags) const;
   virtual bool propertiesEqual(const GstOFTVGElement &b) const;
   virtual inline GstOFTVGElement *copy() const { return new GstOFTVGElement_Constant(*this); }
 

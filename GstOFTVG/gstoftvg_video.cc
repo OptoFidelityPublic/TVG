@@ -235,9 +235,10 @@ static gboolean gst_oftvg_video_start(GstBaseTransform* object)
 {
   GstOFTVG_Video *filter = GST_OFTVG_VIDEO(object);
   filter->frame_counter = 0;
-  filter->last_state_change = G_MININT64;
+  filter->last_state_change = 0;
   filter->end_of_video = G_MAXINT64;
-  filter->progress_timestamp = G_MININT64;
+  filter->progress_timestamp = 0;
+  filter->lipsync_timestamp = 0;
   filter->process = new OFTVG_Video_Process();
   
   if (g_strcmp0(filter->calibration, "off") == 0)
@@ -373,7 +374,21 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   }
   else if (filter->state == STATE_VIDEO)
   {
-    filter->process->process_frame(buf, filter->frame_counter);
+    OFTVG::FrameFlags flags = OFTVG::FRAMEFLAGS_NONE;
+    
+    /* Generate lipsync frames at defined intervals */
+    if (filter->lipsync > 0 &&
+        buffer_end_time >= filter->lipsync_timestamp + GST_MSECOND * filter->lipsync)
+    {
+      GST_DEBUG("Generating lipsync at %" GST_TIME_FORMAT, GST_TIME_ARGS(GST_BUFFER_PTS(buf)));
+      flags = OFTVG::FRAMEFLAGS_LIPSYNC;
+      filter->lipsync_timestamp = buffer_end_time;
+      
+      g_signal_emit(filter, gstoftvg_video_signals[SIGNAL_VIDEO_PROCESSED_UPTO], 0,
+                    filter, GST_BUFFER_PTS(buf), buffer_end_time);
+    }
+    
+    filter->process->process_frame(buf, filter->frame_counter, flags);
     filter->frame_counter++;
     
     if (filter->num_buffers > 0)

@@ -37,6 +37,7 @@
   PROP_STR(LOCATION,    location,    "Layout bitmap file location" , "layout.bmp") \
   PROP_STR(SEQUENCE,    sequence,    "Optional text file with custom color sequence data", "") \
   PROP_INT(NUM_BUFFERS, num_buffers, "Number of frames to include, -1 for all.", -1) \
+  PROP_INT(LIPSYNC,     lipsync,     "Interval of lipsync markers in milliseconds.", -1) \
   PROP_BOOL(SILENT,     silent,      "Suppress progress messages", false)
   
 /* Declaration of the GObject subtype */
@@ -86,6 +87,9 @@ struct _GstOFTVG_Video
   
   /* Last time a progress report was printed. */
   GstClockTime progress_timestamp;
+  
+  /* Last time a lipsync marker was generated. */
+  GstClockTime lipsync_timestamp;
   
   /* This is the actual class that does the processing */
   OFTVG_Video_Process* process;
