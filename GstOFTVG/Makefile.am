@@ -1,8 +1,14 @@
 oftvg_LTLIBRARIES = libgstoftvg.la
 
-libgstoftvg_la_SOURCES = plugin_main.c \
-	gstoftvg.cc gstoftvg_layout.cc \
-	gstoftvg_pixbuf.cc gstoftvg_video.cc gstoftvg_video_process.cc
+# Plugin toplevel files
+libgstoftvg_la_SOURCES = plugin_main.c gstoftvg.cc
+
+# Video filter and helper classes
+libgstoftvg_la_SOURCES += gstoftvg_video.cc
+libgstoftvg_la_SOURCES += gstoftvg_video_process.cc gstoftvg_layout.cc gstoftvg_pixbuf.cc
+
+# Audio source
+libgstoftvg_la_SOURCES += gstoftvg_audio.cc
 
 WFLAGS = -Wall -Wextra -Wno-unused-parameter
 libgstoftvg_la_CFLAGS = $(GST_CFLAGS) $(GDK_CFLAGS) $(WFLAGS)

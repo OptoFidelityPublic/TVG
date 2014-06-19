@@ -70,7 +70,6 @@ enum state_t {STATE_PRECALIBRATION_WHITE, STATE_PRECALIBRATION_MARKS,
 struct _GstOFTVG_Video
 {
   GstBaseTransform element;
-  GstPad *sinkpad, *srcpad;
   
   /* Current state of filter */
   enum state_t state;
@@ -113,6 +112,9 @@ struct _GstOFTVG_VideoClass
 
   /* Signal emitted after each frame is processed */
   void (*signal_video_processed_upto) (GstOFTVG_Video *source, GstClockTime time);
+  
+  /* Signal emitted after video ends */
+  void (*signal_video_end_of_stream) (GstOFTVG_Video *source);
 };
 
 GType gst_oftvg_video_get_type (void);

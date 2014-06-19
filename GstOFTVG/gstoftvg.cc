@@ -60,6 +60,13 @@ G_DEFINE_TYPE (GstOFTVG, gst_oftvg, GST_TYPE_BIN);
 static void gst_oftvg_set_property (GObject * object, guint prop_id, const GValue * value, GParamSpec * pspec);
 static void gst_oftvg_get_property (GObject * object, guint prop_id, GValue * value, GParamSpec * pspec);
 
+/* Callbacks for passing lipsync data between video and audio elements */
+static void lipsync_generated_cb(GstElement *video_element, GstClockTime start,
+                                 GstClockTime end, GstOFTVG *filter);
+static void video_processed_upto_cb(GstElement *video_element, GstClockTime start,
+                                    GstOFTVG *filter);
+static void video_end_of_stream_cb(GstElement *video_element, GstOFTVG *filter);
+
 /* Initializer for the class type */
 static void gst_oftvg_class_init (GstOFTVGClass* klass)
 {
@@ -95,6 +102,19 @@ static void gst_oftvg_class_init (GstOFTVGClass* klass)
     g_type_class_unref(video_class);
   }
   
+  /* Pass through the pads from the audio element */
+  {
+    GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
+    GstElementClass *audio_class = GST_ELEMENT_CLASS(g_type_class_ref(GST_TYPE_OFTVG_AUDIO));
+    
+    GstPadTemplate* pad = gst_element_class_get_pad_template(audio_class, "src");
+    gst_element_class_add_pad_template(element_class,
+      gst_pad_template_new("asrc", pad->direction, pad->presence, pad->caps)
+    );
+    
+    g_type_class_unref(audio_class);
+  }
+  
   /* Pass through the properties from the video element */
   {
     GObjectClass *gobject_class = (GObjectClass *) klass;
@@ -118,20 +138,16 @@ GSTOFTVG_VIDEO_PROPERTIES
   }
 }
 
-static void lipsync_generated_cb(GstElement *video_element, GstClockTime start,
-                                 GstClockTime end, GstBin *oftvg)
-{
-  g_print("Got lipsync event! %lu %lu\n", start, end);
-}
-
 /* Initializer for class instances */
 static void gst_oftvg_init (GstOFTVG* filter)
 {
   GstPad* pad;
   
+  /* Create child elements */
   filter->video_element = GST_OFTVG_VIDEO(gst_element_factory_make("oftvg_video", "video"));
-  
   gst_bin_add(GST_BIN(filter), GST_ELEMENT(filter->video_element));
+  filter->audio_element = GST_OFTVG_AUDIO(gst_element_factory_make("oftvg_audio", "audio"));
+  gst_bin_add(GST_BIN(filter), GST_ELEMENT(filter->audio_element));
   
   /* Add ghost pads for the pads */
   pad = gst_element_get_static_pad(GST_ELEMENT(filter->video_element), "sink");
@@ -140,10 +156,17 @@ static void gst_oftvg_init (GstOFTVG* filter)
   pad = gst_element_get_static_pad(GST_ELEMENT(filter->video_element), "src");
   gst_element_add_pad(GST_ELEMENT(filter), gst_ghost_pad_new ("src", pad));
   gst_object_unref(GST_OBJECT(pad));
+  pad = gst_element_get_static_pad(GST_ELEMENT(filter->audio_element), "src");
+  gst_element_add_pad(GST_ELEMENT(filter), gst_ghost_pad_new ("asrc", pad));
+  gst_object_unref(GST_OBJECT(pad));
   
   /* Connect the signals from the video element */
   g_signal_connect(filter->video_element, "lipsync-generated",
                    G_CALLBACK(lipsync_generated_cb), filter);
+  g_signal_connect(filter->video_element, "video-processed-upto",
+                   G_CALLBACK(video_processed_upto_cb), filter);
+  g_signal_connect(filter->video_element, "video-end-of-stream",
+                   G_CALLBACK(video_end_of_stream_cb), filter);
 }
 
 /* Property setting */
@@ -218,3 +241,22 @@ GSTOFTVG_VIDEO_PROPERTIES
       break;
   }
 }
+
+/* Pass signals from the video element to the audio side */
+static void lipsync_generated_cb(GstElement *video_element, GstClockTime start,
+                                 GstClockTime end, GstOFTVG *filter)
+{
+  gst_oftvg_audio_generate_beep(filter->audio_element, start, end);
+}
+
+static void video_processed_upto_cb(GstElement *video_element, GstClockTime start,
+                                    GstOFTVG *filter)
+{
+  gst_oftvg_audio_generate_silence(filter->audio_element, start);
+}
+
+static void video_end_of_stream_cb(GstElement *video_element, GstOFTVG *filter)
+{
+  gst_oftvg_audio_end_stream(filter->audio_element);
+}
+

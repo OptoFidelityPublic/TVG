@@ -24,6 +24,7 @@
 #include <gst/gst.h>
 #include <gst/gstbin.h>
 #include "gstoftvg_video.hh"
+#include "gstoftvg_audio.hh"
 
 G_BEGIN_DECLS
 
@@ -44,6 +45,7 @@ typedef struct _GstOFTVGClass GstOFTVGClass;
 struct _GstOFTVG {
   GstBin bin;
   GstOFTVG_Video *video_element;
+  GstOFTVG_Audio *audio_element;
 };
 
 struct _GstOFTVGClass {

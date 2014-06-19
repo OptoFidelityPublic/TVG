@@ -1,12 +1,9 @@
+#include "gstoftvg.hh"
 #include "gstoftvg_video.hh"
+#include "gstoftvg_audio.hh"
 
 GST_DEBUG_CATEGORY(gst_oftvg_debug);
 
-/* TODO: Include the proper header */
-/* #include "gstoftvg.hh" */
-GType gst_oftvg_get_type (void);
-#define GST_TYPE_OFTVG \
-  (gst_oftvg_get_type())
 
 /* Entry point to the plugin.
  * Registers all elements implemented by this plugin.
@@ -16,7 +13,8 @@ gboolean oftvg_init (GstPlugin* plugin)
   GST_DEBUG_CATEGORY_INIT(gst_oftvg_debug, "oftvg", 0, "");
   
   return gst_element_register(plugin, "oftvg", GST_RANK_NONE, GST_TYPE_OFTVG)
-      && gst_element_register(plugin, "oftvg_video", GST_RANK_NONE, GST_TYPE_OFTVG_VIDEO);
+      && gst_element_register(plugin, "oftvg_video", GST_RANK_NONE, GST_TYPE_OFTVG_VIDEO)
+      && gst_element_register(plugin, "oftvg_audio", GST_RANK_NONE, GST_TYPE_OFTVG_AUDIO);
 }
 
 #ifndef PACKAGE

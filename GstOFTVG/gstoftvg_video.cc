@@ -50,6 +50,7 @@ enum
 {
   SIGNAL_LIPSYNC_GENERATED,
   SIGNAL_VIDEO_PROCESSED_UPTO,
+  SIGNAL_VIDEO_END_OF_STREAM,
   LAST_SIGNAL
 };
 static guint gstoftvg_video_signals[LAST_SIGNAL] = { 0 };
@@ -168,6 +169,10 @@ static void gst_oftvg_video_class_init (GstOFTVG_VideoClass * klass)
       "video-processed-upto", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
       G_STRUCT_OFFSET(GstOFTVG_VideoClass, signal_video_processed_upto), NULL, NULL, NULL, G_TYPE_NONE,
       1, G_TYPE_UINT64);
+    
+    gstoftvg_video_signals[SIGNAL_VIDEO_END_OF_STREAM] = g_signal_new (
+      "video-end-of-stream", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
+      G_STRUCT_OFFSET(GstOFTVG_VideoClass, signal_video_processed_upto), NULL, NULL, NULL, G_TYPE_NONE, 0);
   }
   
   /* Element properties (generated from X-macros in gstoftvg_video.hh) */
@@ -462,6 +467,8 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   }
   else if (filter->state == STATE_END)
   {
+    g_signal_emit(filter, gstoftvg_video_signals[SIGNAL_VIDEO_END_OF_STREAM], 0);
+    
     /* Note that the current buffer will not be passed forward when we return EOS */
     return GST_FLOW_EOS;
   }
