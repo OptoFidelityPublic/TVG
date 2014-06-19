@@ -107,6 +107,12 @@ GSTOFTVG_VIDEO_PROPERTIES
 struct _GstOFTVG_VideoClass 
 {
   GstBaseTransformClass parent_class;
+  
+  /* Signal emitted when a lipsync marker is generated in the video */
+  void (*signal_lipsync_generated) (GstOFTVG_Video *source, GstClockTime start, GstClockTime end);
+
+  /* Signal emitted after each frame is processed */
+  void (*signal_video_processed_upto) (GstOFTVG_Video *source, GstClockTime time);
 };
 
 GType gst_oftvg_video_get_type (void);

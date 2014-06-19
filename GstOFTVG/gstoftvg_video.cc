@@ -48,8 +48,11 @@ GST_DEBUG_CATEGORY_EXTERN(gst_oftvg_debug);
 /* Identifier numbers for signals emitted by this element */
 enum
 {
+  SIGNAL_LIPSYNC_GENERATED,
+  SIGNAL_VIDEO_PROCESSED_UPTO,
   LAST_SIGNAL
 };
+static guint gstoftvg_video_signals[LAST_SIGNAL] = { 0 };
 
 /* Identifier numbers for properties */
 enum
@@ -111,6 +114,7 @@ G_DEFINE_TYPE (GstOFTVG_Video, gst_oftvg_video, GST_TYPE_BASE_TRANSFORM);
 static void gst_oftvg_video_set_property (GObject * object, guint prop_id, const GValue * value, GParamSpec * pspec);
 static void gst_oftvg_video_get_property (GObject * object, guint prop_id, GValue * value, GParamSpec * pspec);
 static gboolean gst_oftvg_video_start(GstBaseTransform* btrans);
+static gboolean gst_oftvg_video_stop(GstBaseTransform* btrans);
 static gboolean gst_oftvg_video_sink_event(GstBaseTransform *object, GstEvent *event);
 static gboolean gst_oftvg_video_set_caps(GstBaseTransform* btrans, GstCaps* incaps, GstCaps* outcaps);
 static GstFlowReturn gst_oftvg_video_transform_ip (GstBaseTransform * base, GstBuffer * outbuf);
@@ -133,6 +137,7 @@ static void gst_oftvg_video_class_init (GstOFTVG_VideoClass * klass)
     btrans->transform_ip = GST_DEBUG_FUNCPTR(gst_oftvg_video_transform_ip);
     btrans->set_caps     = GST_DEBUG_FUNCPTR(gst_oftvg_video_set_caps);
     btrans->start        = GST_DEBUG_FUNCPTR(gst_oftvg_video_start);
+    btrans->stop         = GST_DEBUG_FUNCPTR(gst_oftvg_video_stop);
     btrans->sink_event   = GST_DEBUG_FUNCPTR(gst_oftvg_video_sink_event);
   }
   
@@ -150,6 +155,19 @@ static void gst_oftvg_video_class_init (GstOFTVG_VideoClass * klass)
       gst_static_pad_template_get (&src_template));
     gst_element_class_add_pad_template (element_class,
 	gst_static_pad_template_get (&sink_template));
+  }
+  
+  /* Signals */
+  {
+    gstoftvg_video_signals[SIGNAL_LIPSYNC_GENERATED] = g_signal_new (
+      "lipsync-generated", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
+      G_STRUCT_OFFSET(GstOFTVG_VideoClass, signal_lipsync_generated), NULL, NULL, NULL, G_TYPE_NONE,
+      2, G_TYPE_UINT64, G_TYPE_UINT64);
+    
+    gstoftvg_video_signals[SIGNAL_VIDEO_PROCESSED_UPTO] = g_signal_new (
+      "video-processed-upto", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
+      G_STRUCT_OFFSET(GstOFTVG_VideoClass, signal_video_processed_upto), NULL, NULL, NULL, G_TYPE_NONE,
+      1, G_TYPE_UINT64);
   }
   
   /* Element properties (generated from X-macros in gstoftvg_video.hh) */
@@ -195,7 +213,7 @@ static void gst_oftvg_video_set_property (GObject *object, guint prop_id,
   GstOFTVG_Video *filter = GST_OFTVG_VIDEO(object);
 
   switch (prop_id) {
-#define PROP_STR(up,name,desc,def)  case PROP_ ## up: filter->name = g_value_dup_string(value); break;
+#define PROP_STR(up,name,desc,def)  case PROP_ ## up: g_free(filter->name); filter->name = g_value_dup_string(value); break;
 #define PROP_INT(up,name,desc,def)  case PROP_ ## up: filter->name = g_value_get_int(value); break;
 #define PROP_BOOL(up,name,desc,def) case PROP_ ## up: filter->name = g_value_get_boolean(value); break;
 GSTOFTVG_VIDEO_PROPERTIES
@@ -249,6 +267,16 @@ static gboolean gst_oftvg_video_start(GstBaseTransform* object)
   {
     filter->state = STATE_PRECALIBRATION_WHITE;
   }
+  
+  return true;
+}
+
+/* Called when the pipeline is stopping */
+static gboolean gst_oftvg_video_stop(GstBaseTransform* object)
+{
+  GstOFTVG_Video *filter = GST_OFTVG_VIDEO(object);
+  delete filter->process;
+  filter->process = NULL;
   
   return true;
 }
@@ -377,15 +405,17 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
     OFTVG::FrameFlags flags = OFTVG::FRAMEFLAGS_NONE;
     
     /* Generate lipsync frames at defined intervals */
-    if (filter->lipsync > 0 &&
-        buffer_end_time >= filter->lipsync_timestamp + GST_MSECOND * filter->lipsync)
+    if (filter->lipsync > 0
+        && (filter->lipsync_timestamp == 0
+            || buffer_end_time >= filter->lipsync_timestamp + GST_MSECOND * filter->lipsync)
+       )
     {
       GST_DEBUG("Generating lipsync at %" GST_TIME_FORMAT, GST_TIME_ARGS(GST_BUFFER_PTS(buf)));
       flags = OFTVG::FRAMEFLAGS_LIPSYNC;
       filter->lipsync_timestamp = buffer_end_time;
       
-      g_signal_emit(filter, gstoftvg_video_signals[SIGNAL_VIDEO_PROCESSED_UPTO], 0,
-                    filter, GST_BUFFER_PTS(buf), buffer_end_time);
+      g_signal_emit(filter, gstoftvg_video_signals[SIGNAL_LIPSYNC_GENERATED], 0,
+                    GST_BUFFER_PTS(buf), buffer_end_time);
     }
     
     filter->process->process_frame(buf, filter->frame_counter, flags);
@@ -440,6 +470,9 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   {
     filter->last_state_change = buffer_end_time;
   }
+  
+  /* Report the timestamp of the frame that we just processed. */
+  g_signal_emit(filter, gstoftvg_video_signals[SIGNAL_VIDEO_PROCESSED_UPTO], 0, buffer_end_time);
   
   return GST_FLOW_OK;
 }

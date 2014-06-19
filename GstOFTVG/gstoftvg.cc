@@ -118,6 +118,12 @@ GSTOFTVG_VIDEO_PROPERTIES
   }
 }
 
+static void lipsync_generated_cb(GstElement *video_element, GstClockTime start,
+                                 GstClockTime end, GstBin *oftvg)
+{
+  g_print("Got lipsync event! %lu %lu\n", start, end);
+}
+
 /* Initializer for class instances */
 static void gst_oftvg_init (GstOFTVG* filter)
 {
@@ -134,6 +140,10 @@ static void gst_oftvg_init (GstOFTVG* filter)
   pad = gst_element_get_static_pad(GST_ELEMENT(filter->video_element), "src");
   gst_element_add_pad(GST_ELEMENT(filter), gst_ghost_pad_new ("src", pad));
   gst_object_unref(GST_OBJECT(pad));
+  
+  /* Connect the signals from the video element */
+  g_signal_connect(filter->video_element, "lipsync-generated",
+                   G_CALLBACK(lipsync_generated_cb), filter);
 }
 
 /* Property setting */
