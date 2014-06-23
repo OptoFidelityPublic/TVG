@@ -89,11 +89,12 @@ set GST_DEBUG=*:3
 
 :: Actual command that executes gst-launch
 gst-launch-1.0 -q ^
-	filesrc location="%INPUT%" ! decodebin name=decode %PREPROCESS% ! queue \
-        ! oftvg location="%LAYOUT%" num-buffers=%NUM_BUFFERS% calibration=%CALIBRATION% \
-                name=oftvg lipsync=%LIPSYNC% \
-        ! queue ! videoconvert ! %COMPRESSION% ! %CONTAINER% name=mux ! filesink location="%OUTPUT%" \
-        oftvg. ! queue ! %AUDIOCOMPRESSION% ! mux.
+	filesrc location="%INPUT%" ! decodebin name=decode %PREPROCESS% ! queue ^
+        ! oftvg location="%LAYOUT%" num-buffers=%NUM_BUFFERS% calibration=%CALIBRATION% ^
+                name=oftvg lipsync=%LIPSYNC% ^
+        ! queue ! videoconvert ! %COMPRESSION% ! %CONTAINER% name=mux ! filesink location="%OUTPUT%" ^
+        oftvg. ! queue ! adder name=audiomix ! %AUDIOCOMPRESSION% ! mux. ^
+        decode. ! queue ! audiomix.
 
 @echo Done! Press enter to exit.
 PAUSE
