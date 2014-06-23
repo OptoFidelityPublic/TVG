@@ -101,7 +101,7 @@ static void gst_oftvg_audio_class_init(GstOFTVG_AudioClass* klass)
 static void gst_oftvg_audio_init(GstOFTVG_Audio* filter)
 {
   gst_base_src_set_format(GST_BASE_SRC(filter), GST_FORMAT_TIME);
-  gst_base_src_set_live(GST_BASE_SRC(filter), TRUE);
+  gst_base_src_set_live(GST_BASE_SRC(filter), FALSE);
 
   filter->queue = g_async_queue_new();
 }
