@@ -7,7 +7,7 @@
 :: and then run it to generate the video.
 
 :: Name of input file (any supported video format)
-SET INPUT=big_buck_bunny_1080p_h264.mov
+SET INPUT=big_buck_bunny_1080p_h264.mp4
 
 :: Name of layout file (bitmap image defining the marker locations)
 SET LAYOUT=layout.bmp
@@ -21,7 +21,7 @@ SET OUTPUT=output.mov
 :: - video/x-raw-yuv     Uncompressed video (YUV)
 :: - video/x-raw-rgb     Uncompressed video (RGB)
 :: - x264enc             H.264 video
-:: - ffenc_mjpeg         Motion-JPEG video
+:: - jpegenc             Motion-JPEG video
 :: - ffenc_mpeg4         MPEG-4 part 2
 :: - ffenc_mpeg2video    MPEG-2 video
 :: - ffenc_wmv2          Windows Media Video 8
@@ -43,7 +43,8 @@ SET CONTAINER=qtmux
 :: - wavenc       Microsoft WAV
 :: - vorbisenc    Vorbis audio encoder
 :: - avenc_mp2    MPEG audio layer 2
-set AUDIOCOMPRESSION="avenc_aac"
+:: - identity     No audio compression (raw PCM)
+set AUDIOCOMPRESSION=avenc_aac compliance=-2
 
 :: Preprocessing (select one or comment all lines to disable)
 :: - videoscale ! video/x-raw-yuv,width=XXX,height=XXX                               Resize the video
@@ -55,7 +56,7 @@ set AUDIOCOMPRESSION="avenc_aac"
 ::SET PREPROCESS=! videorate ! videoscale ! video/x-raw-yuv,framerate=5/1,width=320,height=240
 
 :: Number of frames to process (-1 for full length of input video)
-SET NUM_BUFFERS=-1
+SET NUM_BUFFERS=256
 
 :: Interval of lipsync markers in milliseconds (-1 to disable)
 SET LIPSYNC=-1
@@ -92,9 +93,10 @@ gst-launch-1.0 -q ^
 	filesrc location="%INPUT%" ! decodebin name=decode %PREPROCESS% ! queue ^
         ! oftvg location="%LAYOUT%" num-buffers=%NUM_BUFFERS% calibration=%CALIBRATION% ^
                 name=oftvg lipsync=%LIPSYNC% ^
-        ! queue ! videoconvert ! %COMPRESSION% ! %CONTAINER% name=mux ! filesink location="%OUTPUT%" ^
-        oftvg. ! queue ! adder name=audiomix ! %AUDIOCOMPRESSION% ! mux. ^
-        decode. ! queue ! audiomix.
-
+        ! queue ! videoconvert ! %COMPRESSION% ! queue ! %CONTAINER% name=mux ! filesink location="%OUTPUT%" ^
+        oftvg. ! audioconvert ! audio/x-raw,channels=2,format=S16LE ! queue ! adder name=audiomix ^
+        audiomix. ! audioconvert ! %AUDIOCOMPRESSION% ! queue ! mux. ^
+        decode. ! audioconvert ! audioresample ! queue ! audiomix.
+        
 @echo Done! Press enter to exit.
 PAUSE

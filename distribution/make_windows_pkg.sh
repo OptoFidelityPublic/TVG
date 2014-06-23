@@ -66,7 +66,7 @@ mkdir $PKGDIR/bin
 cp distribution/gst-env.bat $PKGDIR/gstreamer/env.bat
 
 # Copy TVG scripts
-cp examples/*.mov examples/*.tvg examples/*.bmp $PKGDIR
+cp examples/*.mp4 examples/*.tvg examples/*.bmp $PKGDIR
 cp doc/tvg_manual.pdf $PKGDIR
 cp scripts/Run_TVG.bat $PKGDIR
 mkdir $PKGDIR/debug

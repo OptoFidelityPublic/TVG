@@ -7,13 +7,13 @@
 # and then run it to generate the video.
 
 # Name of input file (any supported video format)
-set INPUT="big_buck_bunny_1080p_h264.mov"
+INPUT="big_buck_bunny_1080p_h264.avi"
 
 # Name of layout file (bitmap image defining the marker locations)
-set LAYOUT="layout.bmp"
+LAYOUT="layout.bmp"
 
 # Name of output file
-set OUTPUT="output.mov"
+OUTPUT="output.mov"
 
 # Video compression (select one)
 # You can get configuration parameters for each format in the manual or
@@ -26,7 +26,7 @@ set OUTPUT="output.mov"
 # - ffenc_mpeg2video    MPEG-2 video
 # - ffenc_wmv2          Windows Media Video 8
 # - ffenc_flv           Flash video 
-set COMPRESSION="x264enc speed-preset=4"
+COMPRESSION="x264enc speed-preset=4"
 
 # Video container format (select one)
 # The OUTPUT filename should have the corresponding file extension
@@ -36,14 +36,14 @@ set COMPRESSION="x264enc speed-preset=4"
 # - qtmux        .MOV
 # - asfmux       .ASF
 # - flvmux       .FLV
-set CONTAINER="qtmux"
+CONTAINER="qtmux"
 
 # Audio compression
 # - avenc_aac    Advanced Audio Codec
 # - wavenc       Microsoft WAV
 # - vorbisenc    Vorbis audio encoder
 # - avenc_mp2    MPEG audio layer 2
-set AUDIOCOMPRESSION="avenc_aac"
+AUDIOCOMPRESSION="avenc_aac compliance=-2"
 
 # Video preprocessing (select one or comment all lines to disable)
 # - videoscale ! video/x-raw-yuv,width=XXX,height=XXX                               Resize the video
@@ -55,22 +55,22 @@ set AUDIOCOMPRESSION="avenc_aac"
 # set PREPROCESS="! videorate ! videoscale ! video/x-raw-yuv,framerate=5/1,width=320,height=240"
 
 # Number of frames to process (-1 for full length of input video)
-set NUM_BUFFERS=-1
+NUM_BUFFERS=-1
 
 # Interval of lipsync markers in milliseconds (-1 to disable)
-set LIPSYNC=-1
+LIPSYNC=-1
 
 # Whether to create a calibration video
 # - off      No calibration sequence
 # - only     Only the calibration sequence, ie. create a separate calibration video
 # - prepend  Put the calibration sequence before the actual video
 # - both     Both at start and end (for Video Multimeter)
-set CALIBRATION="both"
+CALIBRATION="off"
 
 # You can put just the settings you want to change in a file named something.tvg
 # and open it with Run_TVG.sh as the program.
 if [ -e "$1" ]
-then eval $(cat $1 | sed 's/^::/#/' | sed 's/SET ([^=]+)=(.+)/set \\1="\\2"/')
+then eval $(cat $1 | sed 's/^::/#/' | sed 's/SET ([^=]+)=(.+)/\\1="\\2"/')
      echo Loaded parameters from $1
 fi
 
@@ -80,19 +80,19 @@ SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd )"
 source "$SCRIPTDIR/gstreamer/env.sh"
 
 # Store debug info in case something goes wrong
-set DEBUGDIR="$SCRIPTDIR/debug"
+DEBUGDIR="$SCRIPTDIR/debug"
 rm -f $DEBUGDIR/*.dot $DEBUGDIR/*.txt $DEBUGDIR/*.png
-set GST_DEBUG_DUMP_DOT_DIR=$DEBUGDIR
-set GST_DEBUG_FILE=$DEBUGDIR\log.txt
-set GST_DEBUG=*:3
+export GST_DEBUG_DUMP_DOT_DIR=$DEBUGDIR
+export GST_DEBUG_FILE=$DEBUGDIR/log.txt
+export GST_DEBUG=*:4
 
 # Actual command that executes gst-launch
-gst-launch-1.0 -q \
-	filesrc location="$INPUT" ! decodebin name=decode $PREPROCESS ! queue \
-	! oftvg location="$LAYOUT" num-buffers=$NUM_BUFFERS calibration=$CALIBRATION \
-	        name=oftvg lipsync=$LIPSYNC \
-	! queue ! videoconvert ! $COMPRESSION ! $CONTAINER name=mux ! filesink location="$OUTPUT" \
-	oftvg. ! queue ! adder name=audiomix ! $AUDIOCOMPRESSION ! mux. \
-	decode. ! queue ! audiomix.
+gst-launch-1.0 -v --gst-plugin-load=libgstoftvg.so \
+        filesrc location="$INPUT" ! decodebin name=decode $PREPROCESS ! queue \
+        ! oftvg location="$LAYOUT" num-buffers=$NUM_BUFFERS calibration=$CALIBRATION \
+                name=oftvg lipsync=$LIPSYNC \
+        ! queue ! videoconvert ! $COMPRESSION ! queue ! $CONTAINER name=mux ! filesink location="$OUTPUT" \
+        decode. ! audioconvert ! audioresample ! queue ! adder name=audiomix ! $AUDIOCOMPRESSION ! queue ! mux. \
+        oftvg. ! audioconvert ! audio/x-raw,channels=2 ! queue ! audiomix.
 
 echo Done!
