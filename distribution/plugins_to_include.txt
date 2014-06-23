@@ -21,7 +21,6 @@ libgstauparse.dll
 libgstautoconvert.dll
 libgstautodetect.dll
 libgstavi.dll
-libgstavscale.dll
 libgstbayer.dll
 libgstcairo.dll
 libgstcamerabin2.dll
@@ -91,10 +90,7 @@ libgstrfbsrc.dll
 libgstrmdemux.dll
 libgstrtp.dll
 libgstrtpmanager.dll
-libgstrtpmux.dll
-libgstrtpvp8.dll
 libgstrtsp.dll
-libgstscaletempoplugin.dll
 libgstschro.dll
 libgstsdpelem.dll
 libgstsegmentclip.dll

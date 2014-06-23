@@ -68,7 +68,7 @@ cp distribution/gst-env.bat $PKGDIR/gstreamer/env.bat
 # Copy TVG scripts
 cp examples/*.mov examples/*.tvg examples/*.bmp $PKGDIR
 cp doc/tvg_manual.pdf $PKGDIR
-cp doc/Run_TVG.bat $PKGDIR
+cp scripts/Run_TVG.bat $PKGDIR
 mkdir $PKGDIR/debug
 
 # Check for missing DLLs
