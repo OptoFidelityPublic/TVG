@@ -72,3 +72,4 @@ libgsturidownloader-1.0-0.dll
 libgstvalidate-1.0-0.dll
 libharfbuzz-0.dll
 libnettle-4-7.dll
+libx265.dll

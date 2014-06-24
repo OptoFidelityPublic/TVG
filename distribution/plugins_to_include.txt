@@ -127,6 +127,7 @@ libgstwavpack.dll
 libgstwavparse.dll
 libgstwinscreencap.dll
 libgstx264.dll
+libgstx265.dll
 libgstxingmux.dll
 libgsty4mdec.dll
 libgsty4menc.dll
