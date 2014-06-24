@@ -21,7 +21,7 @@ cd $SCRIPTPATH/..
 
 # Create a directory for the distribution
 VERSION=$(git describe --always)
-PKGDIR=tvg-$VERSION
+PKGDIR=tvg-$VERSION-windows-x64
 rm -rf $PKGDIR
 mkdir $PKGDIR
 
@@ -77,5 +77,8 @@ if [ "x$MISSING" != x ]
     then echo "These DLLs are possibly missing from the result package:"
 	echo $MISSING
 fi
+
+zip -qr $PKGDIR.zip $PKGDIR
+zip -qr $PKGDIR-debug.zip $PKGDIR-debug
 
 
