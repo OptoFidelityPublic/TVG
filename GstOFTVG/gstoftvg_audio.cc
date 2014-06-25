@@ -277,6 +277,8 @@ GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf
       /* Process the part of the beep that is inside current buffer */
       if (num_samples != 0)
       {
+        GST_DEBUG("Processing beep at offset %d, length %d, phase %d",
+                  start_offset, num_samples, filter->phase);
         add_beep(buf, start_offset, start_offset + num_samples, &filter->phase, num_channels);
       }
     }
