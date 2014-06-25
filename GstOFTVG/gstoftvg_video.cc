@@ -344,6 +344,8 @@ static gboolean gst_oftvg_video_sink_event(GstBaseTransform *object, GstEvent *e
                            " (num_buffers = %d, stream contains %d frames)",
                            filter->num_buffers, filter->frame_counter), (NULL));
     }
+    
+    g_signal_emit(filter, gstoftvg_video_signals[SIGNAL_VIDEO_END_OF_STREAM], 0);
   }
   
   return gst_pad_push_event (filter->element.srcpad, event);
@@ -467,6 +469,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   }
   else if (filter->state == STATE_END)
   {
+    GST_DEBUG("End of video");
     g_signal_emit(filter, gstoftvg_video_signals[SIGNAL_VIDEO_END_OF_STREAM], 0);
     
     /* Note that the current buffer will not be passed forward when we return EOS */
@@ -475,6 +478,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   
   if (filter->state != prev_state)
   {
+    GST_DEBUG("Changing to state %d from state %d", filter->state, prev_state);
     filter->last_state_change = buffer_end_time;
   }
   
