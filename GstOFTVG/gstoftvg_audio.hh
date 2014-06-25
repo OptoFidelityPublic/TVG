@@ -45,18 +45,19 @@ typedef struct _beep_t beep_t;
 /* Structure to contain the internal data of gstoftvg_audio elements */
 struct _GstOFTVG_Audio
 {
-  GstPushSrc element;
+  GstBaseTransform element;
   
   /* Queue used to pass information about the beeps to the processing thread */
   GAsyncQueue *queue;
   
-  /* Timestamp of previously created buffer */
-  GstClockTime timestamp;
+  /* Currently active event */
+  beep_t *current;
+  int phase;
 };
 
 struct _GstOFTVG_AudioClass 
 {
-  GstPushSrcClass parent_class;
+  GstBaseTransformClass parent_class;
 };
 
 GType gst_oftvg_audio_get_type (void);

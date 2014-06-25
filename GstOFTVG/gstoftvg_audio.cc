@@ -45,6 +45,19 @@ GST_DEBUG_CATEGORY_EXTERN(gst_oftvg_debug);
  */
 #define SAMPLERATE 44100
 #define SAMPLERATE_STR "44100"
+static GstStaticPadTemplate sink_template =
+GST_STATIC_PAD_TEMPLATE (
+  "sink",
+  GST_PAD_SINK,
+  GST_PAD_ALWAYS,
+  GST_STATIC_CAPS (
+    "audio/x-raw, "
+    "format = (string) \"" GST_AUDIO_NE(S16) "\", "
+    "rate = (int) " SAMPLERATE_STR ", "
+    "layout = (string) interleaved, "
+    "channels = (int) 2;"
+  )
+);
 static GstStaticPadTemplate src_template =
 GST_STATIC_PAD_TEMPLATE (
   "src",
@@ -54,32 +67,29 @@ GST_STATIC_PAD_TEMPLATE (
     "audio/x-raw, "
     "format = (string) \"" GST_AUDIO_NE(S16) "\", "
     "rate = (int) " SAMPLERATE_STR ", "
-    "channels = (int) 1;"
+    "layout = (string) interleaved, "
+    "channels = (int) 2;"
   )
 );
 
 /* Definition of the GObject subtype. */
 static void gst_oftvg_audio_class_init(GstOFTVG_AudioClass* klass);
 static void gst_oftvg_audio_init(GstOFTVG_Audio* filter);
-G_DEFINE_TYPE (GstOFTVG_Audio, gst_oftvg_audio, GST_TYPE_PUSH_SRC);
+G_DEFINE_TYPE (GstOFTVG_Audio, gst_oftvg_audio, GST_TYPE_BASE_TRANSFORM);
 
 /* Prototypes for the overridden methods */
-static gboolean gst_oftvg_audio_start(GstBaseSrc* object);
-GstFlowReturn gst_oftvg_audio_create(GstPushSrc *src, GstBuffer **buf);
+static gboolean gst_oftvg_audio_start(GstBaseTransform* object);
+static GstFlowReturn gst_oftvg_audio_transform_ip (GstBaseTransform *base, GstBuffer *buf);
 
 /* Initializer for the class type */
 static void gst_oftvg_audio_class_init(GstOFTVG_AudioClass* klass)
 {
-  /* GstPushSrc method overrides */
-  {  
-    GstPushSrcClass *gstpushsrc_class = (GstPushSrcClass *) klass;
-    gstpushsrc_class->create = GST_DEBUG_FUNCPTR(gst_oftvg_audio_create);
-  }
-  
-  /* GstBaseSrc method overrides */
+  /* GstBaseTransform method overrides */
   {
-    GstBaseSrcClass *gstbasesrc_class = (GstBaseSrcClass *) klass;
-    gstbasesrc_class->start = GST_DEBUG_FUNCPTR(gst_oftvg_audio_start);
+    GstBaseTransformClass* btrans = GST_BASE_TRANSFORM_CLASS(klass);
+    
+    btrans->start        = GST_DEBUG_FUNCPTR(gst_oftvg_audio_start);
+    btrans->transform_ip = GST_DEBUG_FUNCPTR(gst_oftvg_audio_transform_ip);
   }
   
   /* Element metadata */
@@ -94,22 +104,23 @@ static void gst_oftvg_audio_class_init(GstOFTVG_AudioClass* klass)
     
     gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&src_template));
+    
+    gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&sink_template));
   }
 }
 
 /* Initializer for class instances */
 static void gst_oftvg_audio_init(GstOFTVG_Audio* filter)
 {
-  gst_base_src_set_format(GST_BASE_SRC(filter), GST_FORMAT_TIME);
-  gst_base_src_set_live(GST_BASE_SRC(filter), FALSE);
-
   filter->queue = g_async_queue_new();
 }
 
-static gboolean gst_oftvg_audio_start(GstBaseSrc* object)
+static gboolean gst_oftvg_audio_start(GstBaseTransform* object)
 {
   GstOFTVG_Audio *filter = GST_OFTVG_AUDIO(object);
-  filter->timestamp = 0;
+  filter->current = NULL;
+  filter->phase = 0;
   return TRUE;
 }
 
@@ -146,72 +157,149 @@ void gst_oftvg_audio_end_stream(GstOFTVG_Audio* element)
   g_async_queue_push(element->queue, entry);
 }
 
-static GstBuffer *create_buffer(int silent_samples, int beep_samples)
+/* Add the beep sound on top of existing audio in the buffer
+ * start: index of first sample to modify
+ * end:   index of last sample to modify
+ * phase: keeps track of the sine wave phase between buffers
+ */
+static void add_beep(GstBuffer *buffer, int start, int end, int *phase, int num_channels)
 {
-  int size = (silent_samples + beep_samples) * sizeof(gint16);
-  gint16 *data = (gint16*)g_malloc0(size);
-  
-  for (int i = 0; i < beep_samples; i++)
+  /* Map the buffer data to memory */
+  GstMapInfo mapinfo;
+  if (!gst_buffer_map(buffer, &mapinfo, GST_MAP_WRITE))
   {
-    float v = 0;
-    v += sin(2 * M_PI * 547 * i / SAMPLERATE);
-    v += sin(2 * M_PI * 1823 * i / SAMPLERATE);
-    data[i + silent_samples] = (gint16)(16384 * v);
+    GST_ERROR("Could not map buffer");
+    return;
   }
   
-  return gst_buffer_new_wrapped(data, size);;
+  gint16 *data = (gint16*)mapinfo.data;
+  
+  for (int i = start; i < end; i++)
+  {
+    float s = 0;
+    int p = *phase;
+    *phase += 1;
+    s += sin(2 * M_PI * 547 * p / SAMPLERATE);
+    s += sin(2 * M_PI * 1823 * p / SAMPLERATE);
+    
+    /* Add to existing data at about 75% volume */
+    for (int j = 0; j < num_channels; j++)
+    {
+      int index = i * num_channels + j;
+      float v = 16384 * s + data[index];
+      if (v > 32767) v = 32767;
+      if (v < -32767) v = -32767;
+      data[index] = (gint16)v;
+    }
+  }
+  
+  gst_buffer_unmap(buffer, &mapinfo);
 }
 
-/* Create a new buffer (called by the GstPushSrc base class) */
-GstFlowReturn gst_oftvg_audio_create(GstPushSrc *src, GstBuffer **buf)
+/* Modify the audio buffer (called by the GstBaseTransform base class) */
+GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf)
 {
   GstOFTVG_Audio *filter = GST_OFTVG_AUDIO(src);
-  beep_t *entry;
+  int offset = 0;
+  int num_channels = 2;
+  int buflen = gst_buffer_get_size(buf) / sizeof(gint16) / num_channels;
+  bool end_of_stream = false;
   
-  GstClockTime min_time = GST_SECOND / SAMPLERATE;
-  do {
-    entry = (beep_t*) g_async_queue_pop(filter->queue);
-  } while (entry->end <= filter->timestamp + min_time);
+  GST_DEBUG("Incoming buffer: %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT " (%d samples)",
+            GST_TIME_ARGS(GST_BUFFER_PTS(buf)),
+            GST_TIME_ARGS(GST_BUFFER_PTS(buf) + GST_BUFFER_DURATION(buf)),
+            buflen);
   
-  if (entry->start == entry->end)
+  /* Repeat until the whole buffer has been processed */
+  while (offset < buflen && !end_of_stream)
   {
-    GST_DEBUG("Silence up to %" GST_TIME_FORMAT ", prev time %" GST_TIME_FORMAT,
-            GST_TIME_ARGS(entry->start), GST_TIME_ARGS(filter->timestamp));
+    /* Calculate timestamp at this offset */
+    GstClockTime start_time = GST_BUFFER_PTS(buf) + GST_SECOND * offset / SAMPLERATE;
+    
+    /* Fetch a new beep entry if needed */
+    int min_len = GST_SECOND / SAMPLERATE;
+    if (filter->current == NULL || filter->current->end <= start_time + min_len)
+    {
+      if (filter->current != NULL)
+      {
+        GST_DEBUG("Releasing beep that ends at %" GST_TIME_FORMAT ", "
+                  "waiting for one at %" GST_TIME_FORMAT,
+                  GST_TIME_ARGS(filter->current->end),
+                  GST_TIME_ARGS(start_time + min_len));
+        g_free(filter->current);
+      }
+        
+      filter->current = (beep_t*) g_async_queue_pop(filter->queue);
+      filter->phase = 0;
+      
+      if (filter->current->start >= G_MAXINT64)
+      {
+        /* G_MAXINT64 tells us that the video stream has ended */
+        GST_DEBUG("End of audio stream");
+        end_of_stream = true;
+      }
+      else if (filter->current->start == filter->current->end)
+      {
+        GST_DEBUG("Silence up to %" GST_TIME_FORMAT, GST_TIME_ARGS(filter->current->start));
+      }
+      else
+      {
+        GST_DEBUG("Beep: %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT,
+                  GST_TIME_ARGS(filter->current->start),
+                  GST_TIME_ARGS(filter->current->end));
+      }
+    }
+    
+    /* Figure out at which offset the beep starts */
+    GstClockTimeDiff delta = (filter->current->start - start_time);
+    int start_offset = offset + delta * SAMPLERATE / GST_SECOND;
+    
+    /* Figure out how many samples long the beep is */
+    GstClockTimeDiff length = (filter->current->end - filter->current->start);
+    int num_samples = length * SAMPLERATE / GST_SECOND;
+    
+    /* Check if the beep overlaps this buffer */
+    if (start_offset < buflen)
+    {
+      /* Check if it started in previous buffer */
+      if (start_offset < 0)
+      {
+        num_samples -= start_offset;
+        start_offset = 0;
+      }
+      
+      /* Check if it extends beyond current buffer */
+      if (start_offset + num_samples > buflen)
+      {
+        num_samples = buflen - start_offset;
+      }
+        
+      /* Process the part of the beep that is inside current buffer */
+      if (num_samples != 0)
+      {
+        add_beep(buf, start_offset, start_offset + num_samples, &filter->phase, num_channels);
+      }
+    }
+    
+    /* Update the offset for while loop condition */
+    if (offset == start_offset + num_samples)
+    {
+      /* Avoid infinite loop if there is a mistake in calculations */
+      GST_ERROR("No progress at %d", offset);
+      return GST_FLOW_ERROR;
+    }
+    offset = start_offset + num_samples;
+  }
+  
+  if (end_of_stream)
+  {
+    g_free(filter->current);
+    filter->current = NULL;
+    return GST_FLOW_EOS;
   }
   else
   {
-    GST_DEBUG("Beep: %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT ", prev time %" GST_TIME_FORMAT,
-              GST_TIME_ARGS(entry->start), GST_TIME_ARGS(entry->end),
-              GST_TIME_ARGS(filter->timestamp));
+    GST_DEBUG("Buffer done");
+    return GST_FLOW_OK;
   }
-  
-  /* G_MAXINT64 marks the end of stream. */
-  if (entry->start >= G_MAXINT64)
-  {
-    return GST_FLOW_EOS;
-  }
-  
-  /* Count the number of silent and beep samples needed */
-  GstClockTime delta = (entry->start - filter->timestamp);
-  GstClockTime length = (entry->end - entry->start);
-  int silent_samples = delta * SAMPLERATE / GST_SECOND;
-  int beep_samples = length * SAMPLERATE / GST_SECOND;
-  
-  if (silent_samples == 0 && beep_samples == 0)
-  {
-    GST_ERROR("Zero sample count");
-    silent_samples = 1;
-  }
-  
-  /* Create the buffer */
-  *buf = create_buffer(silent_samples, beep_samples);
-  
-  /* Set timestamps for the buffer */
-  GST_BUFFER_DURATION(*buf) = (silent_samples + beep_samples) * GST_SECOND / SAMPLERATE;
-  GST_BUFFER_TIMESTAMP(*buf) = filter->timestamp;
-  filter->timestamp += GST_BUFFER_DURATION(*buf);
-  
-  g_free(entry);
-  
-  return GST_FLOW_OK;
 }

@@ -96,9 +96,8 @@ gst-launch-1.0 -q ^
         ! oftvg location="%LAYOUT%" num-buffers=%NUM_BUFFERS% calibration=%CALIBRATION% ^
                 name=oftvg lipsync=%LIPSYNC% ^
         ! queue ! videoconvert ! %COMPRESSION% ! queue ! %CONTAINER% name=mux ! filesink location="%OUTPUT%" ^
-        oftvg. ! audioconvert ! audio/x-raw,channels=2,format=S16LE ! queue ! adder name=audiomix ^
-        audiomix. ! audioconvert ! %AUDIOCOMPRESSION% ! queue ! mux. ^
-        decode. ! audioconvert ! audioresample ! queue ! audiomix.
+        decode. ! audioconvert ! audioresample ! queue ! oftvg. ^
+        oftvg. ! queue ! audioconvert ! %AUDIOCOMPRESSION% ! queue ! mux.
         
 @echo Done! Press enter to exit.
 PAUSE

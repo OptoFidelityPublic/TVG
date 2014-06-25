@@ -106,8 +106,14 @@ static void gst_oftvg_class_init (GstOFTVGClass* klass)
   {
     GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
     GstElementClass *audio_class = GST_ELEMENT_CLASS(g_type_class_ref(GST_TYPE_OFTVG_AUDIO));
+    GstPadTemplate* pad;
     
-    GstPadTemplate* pad = gst_element_class_get_pad_template(audio_class, "src");
+    pad = gst_element_class_get_pad_template(audio_class, "sink");
+    gst_element_class_add_pad_template(element_class,
+      gst_pad_template_new("asink", pad->direction, pad->presence, pad->caps)
+    );
+    
+    pad = gst_element_class_get_pad_template(audio_class, "src");
     gst_element_class_add_pad_template(element_class,
       gst_pad_template_new("asrc", pad->direction, pad->presence, pad->caps)
     );
@@ -158,6 +164,9 @@ static void gst_oftvg_init (GstOFTVG* filter)
   gst_object_unref(GST_OBJECT(pad));
   pad = gst_element_get_static_pad(GST_ELEMENT(filter->audio_element), "src");
   gst_element_add_pad(GST_ELEMENT(filter), gst_ghost_pad_new ("asrc", pad));
+  gst_object_unref(GST_OBJECT(pad));
+  pad = gst_element_get_static_pad(GST_ELEMENT(filter->audio_element), "sink");
+  gst_element_add_pad(GST_ELEMENT(filter), gst_ghost_pad_new ("asink", pad));
   gst_object_unref(GST_OBJECT(pad));
   
   /* Connect the signals from the video element */
