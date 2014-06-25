@@ -264,7 +264,7 @@ GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf
       /* Check if it started in previous buffer */
       if (start_offset < 0)
       {
-        num_samples -= start_offset;
+        num_samples += start_offset;
         start_offset = 0;
       }
       
@@ -284,12 +284,6 @@ GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf
     }
     
     /* Update the offset for while loop condition */
-    if (offset == start_offset + num_samples)
-    {
-      /* Avoid infinite loop if there is a mistake in calculations */
-      GST_ERROR("No progress at %d", offset);
-      return GST_FLOW_ERROR;
-    }
     offset = start_offset + num_samples;
   }
   
