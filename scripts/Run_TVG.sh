@@ -7,7 +7,7 @@
 # and then run it to generate the video.
 
 # Name of input file (any supported video format)
-INPUT="big_buck_bunny_1080p_h264.avi"
+INPUT="big_buck_bunny_1080p_h264.mp4"
 
 # Name of layout file (bitmap image defining the marker locations)
 LAYOUT="layout.bmp"
@@ -78,7 +78,7 @@ fi
 
 echo Starting test video generator..
 
-SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd )"
+SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "$SCRIPTDIR/gstreamer/env.sh"
 
 # Store debug info in case something goes wrong
@@ -89,7 +89,7 @@ export GST_DEBUG_FILE=$DEBUGDIR/log.txt
 export GST_DEBUG=*:4
 
 # Actual command that executes gst-launch
-gst-launch-1.0 -v --gst-plugin-load=libgstoftvg.so \
+gst-launch-1.0 -q \
         filesrc location="$INPUT" ! decodebin name=decode $PREPROCESS ! queue \
         ! oftvg location="$LAYOUT" num-buffers=$NUM_BUFFERS calibration=$CALIBRATION \
                 name=oftvg lipsync=$LIPSYNC \

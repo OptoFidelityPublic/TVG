@@ -46,8 +46,10 @@ done
 
 # Copy GStreamer plugins
 PLUGINS=$(cat distribution/plugins_to_include.txt)
-for f in $PLUGINS
-    do pick lib/gstreamer-1.0/$f gstreamer/lib/gstreamer-1.0
+PLATFORM_SPECIFIC="libgstd3dvideosink libgstdirectsoundsink libgstdirectsoundsrc
+                   libgstwaveformsink libgstwinscreencap"
+for f in $PLUGINS $PLATFORM_SPECIFIC
+    do pick lib/gstreamer-1.0/$f.dll gstreamer/lib/gstreamer-1.0
 done
 
 # Strip debug symbols from files. This reduces the
