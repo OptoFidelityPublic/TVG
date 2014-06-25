@@ -1,6 +1,6 @@
 This is the source code distribution of OptoFidelity Test Video Generator.
 Use it only if you want to compile TVG yourself - there are binary distributions
-available at http://code.google.com/p/oftvg/downloads/list.
+available at https://github.com/OptoFidelity/TVG/releases
 
 --
 
@@ -11,12 +11,15 @@ Compiling (for Windows 64-bit target, on 64-bit Linux host):
          temp files during build.
    
    mkdir ~/dev; cd ~/dev
-   git clone git://anongit.freedesktop.org/gstreamer/sdk/cerbero
+   git clone https://github.com/OptoFidelity/cerbero.git
+   # (You can also use upstream git://anongit.freedesktop.org/gstreamer/sdk/cerbero)
    cd cerbero
 
-2. Bootstrap and build gstreamer for the platform that you are interested in:
-   ./cerbero-uninstalled –c config/cross-win64.cbc bootstrap
+2. Bootstrap and build gstreamer:
+   ./cerbero-uninstalled -c config/cross-win64.cbc bootstrap
    ./cerbero-uninstalled -c config/cross-win64.cbc package gstreamer-1.0
+   Errors about WiX in packaging stage can be ignored, as we do not use the MSI
+   packages.
 
 3. Checkout the oftvg repo.
 
@@ -26,4 +29,32 @@ Compiling (for Windows 64-bit target, on 64-bit Linux host):
 5. Run the packaging script:
    distribution/make_windows_pkg.sh ~/cerbero/dist/windows_x86_64
 
+--
+
+Compiling (for Linux 64-bit target, on 64-bit Linux host):
+
+1. Checkout newest cerbero from Git repo.
+   Note: do not place it directly in ~, because ~/cerbero will be used for
+         temp files during build.
+   
+   mkdir ~/dev; cd ~/dev
+   git clone https://github.com/OptoFidelity/cerbero.git
+   # (You can also use upstream git://anongit.freedesktop.org/gstreamer/sdk/cerbero)
+   cd cerbero
+
+2. Bootstrap and build gstreamer:
+   ./cerbero-uninstalled -c config/linux.config bootstrap
+   ./cerbero-uninstalled -c config/linux.config package gstreamer-1.0
+
+3. Checkout the oftvg repo.
+
+4. Build oftvg using the included config file
+   ./cerbero-uninstalled -c ~/oftvg/cerbero/linux.config build oftvg 
+
+5. Run the packaging script:
+   distribution/make_linux_pkg.sh ~/cerbero/dist/linux_x86_64
+
+Note that the distribution version you use to build will determine the minimum
+system requirements for the built package. For example, it will not run with
+an older version of glibc.
 
