@@ -22,7 +22,7 @@ OUTPUT="output.mov"
 # - video/x-raw-rgb     Uncompressed video (RGB)
 # - x264enc             H.264 video
 # - x265enc             H.265 video
-# - ffenc_mjpeg         Motion-JPEG video
+# - jpegenc             Motion-JPEG video
 # - ffenc_mpeg4         MPEG-4 part 2
 # - ffenc_mpeg2video    MPEG-2 video
 # - ffenc_wmv2          Windows Media Video 8
@@ -33,11 +33,13 @@ COMPRESSION="x264enc speed-preset=4"
 # Video container format (select one)
 # The OUTPUT filename should have the corresponding file extension
 # - mp4mux       .MP4
-# - gppmux       .3GP
+# - 3gppmux      .3GP
 # - avimux       .AVI
 # - qtmux        .MOV
 # - asfmux       .ASF
 # - flvmux       .FLV
+# - matroskamux  .MKV
+# - webmmux      .WEBM
 CONTAINER="qtmux"
 
 # Audio compression

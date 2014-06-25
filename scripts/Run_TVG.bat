@@ -33,11 +33,13 @@ SET COMPRESSION=x264enc speed-preset=4
 :: Video container format (select one)
 :: The OUTPUT filename should have the corresponding file extension
 :: - mp4mux       .MP4
-:: - gppmux       .3GP
+:: - 3gppmux      .3GP
 :: - avimux       .AVI
 :: - qtmux        .MOV
 :: - asfmux       .ASF
 :: - flvmux       .FLV
+:: - matroskamux  .MKV
+:: - webmmux      .WEBM
 SET CONTAINER=qtmux
 
 :: Audio compression
