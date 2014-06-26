@@ -8,6 +8,11 @@ libdv.so*
 libfaad.so*
 libFLAC.so*
 libffi.so*
+libfontconfig.so*
+libfreetype.so*
+libpangoft2-1.0.so*
+libpixman-1.so*
+libtiff.so*
 libgdk_pixbuf-2.0.so*
 libgio-2.0.so*
 libglib-2.0.so*
@@ -60,3 +65,6 @@ libvpx.so*
 libwavpack.so*
 libx264.so*
 libx265.so*
+libxml2.so*
+libexpat.so*
+libharfbuzz.so*

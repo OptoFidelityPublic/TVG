@@ -12,7 +12,7 @@ exit 1
 fi
 
 # Abort on errors
-set -e
+#set -e
 
 # Change to the oftvg root directory
 BUILDDIR=$(readlink -f "$1")
@@ -51,7 +51,7 @@ done
 
 # Copy GStreamer plugins
 PLUGINS=$(cat distribution/plugins_to_include.txt)
-PLATFORM_SPECIFIC="libgstpulse libgstvideo4linux2 libgstximagesink
+PLATFORM_SPECIFIC="libgstvideo4linux2 libgstximagesink
                    libgstximagesrc libgstxvimagesink"
 for f in $PLUGINS $PLATFORM_SPECIFIC
     do pick lib/gstreamer-1.0/$f.so gstreamer/lib/gstreamer-1.0
@@ -84,12 +84,13 @@ mkdir $PKGDIR/debug
 MISSING="$(distribution/list_needed_sos.sh $PKGDIR/gstreamer/bin/*
                                            $PKGDIR/gstreamer/lib/*.so*
                                            $PKGDIR/gstreamer/lib/gstreamer-1.0/*)"
+
 if [ "x$MISSING" != x ]
     then echo "These SOs are possibly missing from the result package:"
         echo $MISSING
 fi
 
-tar czf $PKGDIR.tar.gz $PKGDIR
-tar czf $PKGDIR-debug.tar.gz $PKGDIR-debug
+tar -czf $PKGDIR.tar.gz $PKGDIR
+tar -czf $PKGDIR-debug.tar.gz $PKGDIR-debug
 
 
