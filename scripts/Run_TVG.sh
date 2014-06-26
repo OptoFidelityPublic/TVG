@@ -21,12 +21,12 @@ OUTPUT="output.mov"
 # - video/x-raw-yuv     Uncompressed video (YUV)
 # - video/x-raw-rgb     Uncompressed video (RGB)
 # - x264enc             H.264 video
-# - x265enc             H.265 video
+# - avenc_libx265       H.265 video
 # - jpegenc             Motion-JPEG video
-# - ffenc_mpeg4         MPEG-4 part 2
-# - ffenc_mpeg2video    MPEG-2 video
-# - ffenc_wmv2          Windows Media Video 8
-# - ffenc_flv           Flash video 
+# - avenc_mpeg4         MPEG-4 part 2
+# - avenc_mpeg2video    MPEG-2 video
+# - avenc_wmv2          Windows Media Video 8
+# - avenc_flv           Flash video 
 # - vp9enc              Google VP9 video
 COMPRESSION="x264enc speed-preset=4"
 
