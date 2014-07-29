@@ -54,5 +54,5 @@ AC_SUBST(oftvgdir)
 GST_PLUGIN_LDFLAGS='-module -avoid-version -export-symbols-regex [_]*\(gst_\|Gst\|GST_\).* -no-undefined'
 AC_SUBST(GST_PLUGIN_LDFLAGS)
 
-AC_CONFIG_FILES([Makefile GstOFTVG/Makefile])
+AC_CONFIG_FILES([Makefile GstOFTVG/Makefile Analyzer/Makefile])
 AC_OUTPUT

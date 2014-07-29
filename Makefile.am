@@ -1,2 +1,2 @@
-SUBDIRS = GstOFTVG
+SUBDIRS = GstOFTVG Analyzer
 
