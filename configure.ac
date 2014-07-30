@@ -28,6 +28,7 @@ PKG_CHECK_MODULES([GST],
     [gstreamer-1.0 >= $GST_REQ
     gstreamer-base-1.0 >= $GST_REQ
     gstreamer-plugins-base-1.0 >= $GST_REQ
+    gstreamer-app-1.0 >= $GST_REQ
     gstreamer-pbutils-1.0 >= $GST_REQ
     gstreamer-video-1.0 >= $GST_REQ],
     [AC_SUBST(GST_CFLAGS) AC_SUBST(GST_LIBS)]
@@ -36,6 +37,11 @@ PKG_CHECK_MODULES([GST],
 PKG_CHECK_MODULES([GDK],
     [gdk-pixbuf-2.0 >= 2.0.0],
     [AC_SUBST(GDK_CFLAGS) AC_SUBST(GDK_LIBS)]
+)
+
+PKG_CHECK_MODULES([ZLIB],
+    [zlib],
+    [AC_SUBST(ZLIB_CFLAGS) AC_SUBST(ZLIB_LIBS)]
 )
 
 # Checks for header files.

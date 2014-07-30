@@ -5,6 +5,7 @@
 #define _TVG_LOADER_H_
 
 #include <gst/gst.h>
+#include <stdbool.h>
 
 typedef struct _loader_t loader_t;
 
@@ -23,6 +24,13 @@ const gchar *loader_get_video_decoder(loader_t *state);
 /* Get descriptive name of the audio decompressor element */
 const gchar *loader_get_audio_decoder(loader_t *state);
 
+/* Get resolution of video frames */
+void loader_get_resolution(loader_t *state, int *width, int *height);
+
+/* Retrieve video/audio buffers. Atleast one of the returned pointers
+ * is non-NULL after the call, *except* on end-of-stream when it returns false. */
+bool loader_get_buffer(loader_t *state, GstBuffer **audio_buf,
+                       GstBuffer **video_buf, GError **error);
 
 
 #endif
