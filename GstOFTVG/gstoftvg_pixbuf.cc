@@ -82,7 +82,6 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
       if (red == syncMarks[i][0] && green == syncMarks[i][1] && blue == syncMarks[i][2])
       {
         // Sync mark
-        gboolean isSyncMark = true;
         if (overlay_mode == OFTVG::OVERLAY_MODE_WHITE || overlay_mode == OFTVG::OVERLAY_MODE_CALIBRATION)
         {
           // Sync marks are not visible in the calibration image.
@@ -111,7 +110,6 @@ static void gst_oftvg_init_layout_from_bitmap(const GdkPixbuf* buf,
 {
   int width = gdk_pixbuf_get_width(buf);
   int height = gdk_pixbuf_get_height(buf);
-  int bits_per_sample = gdk_pixbuf_get_bits_per_sample(buf);
   int rowstride = gdk_pixbuf_get_rowstride(buf);
   const guchar* const pixels = gdk_pixbuf_get_pixels(buf);
   int n_channels = gdk_pixbuf_get_n_channels(buf);
