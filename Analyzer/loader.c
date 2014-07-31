@@ -1,6 +1,7 @@
 #include "loader.h"
 #include <gst/app/gstappsink.h>
 #include <gst/audio/audio.h>
+#include <gst/video/video.h>
 #include <stdbool.h>
 #include <string.h>
 
@@ -246,6 +247,23 @@ const gchar *loader_get_video_decoder(loader_t *state)
 const gchar *loader_get_audio_decoder(loader_t *state)
 {
   return get_element_name_with_klass(state, "Decoder/Audio");
+}
+
+void loader_get_resolution(loader_t *state, int *width, int *height, int *stride)
+{
+  GstPad *videopad = gst_element_get_static_pad(state->videosink, "sink");
+  GstCaps *caps = gst_pad_get_current_caps(videopad);
+  GstVideoInfo info;
+  
+  gst_video_info_init(&info);
+  gst_video_info_from_caps(&info, caps);
+  
+  *width = GST_VIDEO_INFO_WIDTH(&info);
+  *height = GST_VIDEO_INFO_HEIGHT(&info);
+  *stride = GST_VIDEO_INFO_COMP_STRIDE(&info, 0);
+  
+  gst_caps_unref(caps);
+  g_object_unref(videopad);
 }
 
 bool loader_get_buffer(loader_t *state, GstBuffer **audio_buf,
