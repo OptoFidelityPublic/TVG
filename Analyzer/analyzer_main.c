@@ -4,6 +4,7 @@
 #include "loader.h"
 #include "layout.h"
 #include "lipsync.h"
+#include "markertype.h"
 
 typedef struct {
   const char *filename;
@@ -11,6 +12,8 @@ typedef struct {
   int num_frames;
   GArray *lipsync_markers; /* lipsync_marker_t, detected beeps */
   GArray *frame_data; /* char*, detected marker states in frames */
+  GArray *frame_times; /* GstClockTime */
+  int rgb6_marker_index; /* Index of the RGB6 marker */
 } main_state_t;
 
 /* First pass through the input video:
@@ -79,21 +82,8 @@ bool first_pass(main_state_t *main_state, GError **error)
   printf("    Video length:     %0.3f s\n", (float)video_end_time / GST_SECOND);
   printf("    Audio length:     %0.3f s\n", (float)audio_end_time / GST_SECOND);
   
-  {
-    GArray *markers = layout_fetch(layout_state);
-    main_state->markers = markers;
-    
-    size_t i;
-    printf("    Markers found:    %d\n", markers->len);
-    for (i = 0; i < markers->len; i++)
-    {
-      marker_t *marker = &g_array_index(markers, marker_t, i);
-      printf("      %3d: at (%4d,%4d) size %dx%d type %s\n", (int)i,
-             marker->x1, marker->y1,
-             marker->x2 - marker->x1 + 1, marker->y2 - marker->y1 + 1,
-             marker->is_rgb ? "RGB" : "BW");
-    }
-  }
+  main_state->markers = layout_fetch(layout_state);
+  printf("    Markers found:    %d\n", main_state->markers->len);
   
   loader_close(loader_state);
   layout_free(layout_state);
@@ -119,6 +109,7 @@ bool second_pass(main_state_t *main_state, GError **error)
   
   lipsync_state = lipsync_create(44100);
   main_state->frame_data = g_array_new(false, false, sizeof(char*));
+  main_state->frame_times = g_array_new(false, false, sizeof(GstClockTime));
   
   int num_frames = 0;
   GstBuffer *audio_buf, *video_buf;
@@ -139,7 +130,8 @@ bool second_pass(main_state_t *main_state, GError **error)
         gst_buffer_map(video_buf, &mapinfo, GST_MAP_READ);
         
         char *states = layout_read_markers(main_state->markers, mapinfo.data, stride);
-        g_array_append_val(main_state->frame_data, states);        
+        g_array_append_val(main_state->frame_data, states);
+        g_array_append_val(main_state->frame_times, video_buf->pts);
         
         gst_buffer_unmap(video_buf, &mapinfo);
       }
@@ -165,9 +157,130 @@ bool second_pass(main_state_t *main_state, GError **error)
   }
   
   main_state->lipsync_markers = lipsync_fetch(lipsync_state);
-  lipsync_free(
+  lipsync_free(lipsync_state);
   loader_close(loader_state);
   return true;
+}
+
+/* Print the collected information about markers */
+static void print_marker_info(main_state_t *main_state)
+{
+  videoinfo_t *videoinfo = markertype_analyze(main_state->frame_data);
+  size_t i;
+  
+  main_state->rgb6_marker_index = -1;
+  for (i = 0; i < main_state->markers->len; i++)
+  {
+    marker_t *marker = &g_array_index(main_state->markers, marker_t, i);
+    markerinfo_t *info = &videoinfo->markerinfo[i];
+    
+    printf("      Marker %3d: at (%4d,%4d) size %dx%d", (int)i,
+            marker->x1, marker->y1,
+            marker->x2 - marker->x1 + 1, marker->y2 - marker->y1 + 1);
+    
+    if (info->type == TVG_MARKER_SYNCMARK)
+      printf(" type SYNCMARK interval %d\n", info->interval);
+    else if (info->type == TVG_MARKER_FRAMEID)
+      printf(" type FRAMEID interval %d\n", info->interval);
+    else if (info->type == TVG_MARKER_RGB6)
+      printf(" type RGB6\n");
+    else
+      printf(" type UNKNOWN\n");
+    
+    if (info->type == TVG_MARKER_RGB6)
+      main_state->rgb6_marker_index = i;
+  }
+  
+  printf("    Number of header frames:  %5d\n", videoinfo->num_header_frames);
+  printf("    Number of locator frames: %5d\n", videoinfo->num_locator_frames);
+  printf("    Number of content frames: %5d\n", videoinfo->num_content_frames);
+  printf("    Number of trailer frames: %5d\n", videoinfo->num_trailer_frames);
+  
+  markertype_free(videoinfo);
+}
+
+/* Calculate statistics about lipsync markers */
+static void print_lipsync_info(main_state_t *main_state)
+{
+  size_t beep_index = 0;
+  size_t frame_index = 0;
+  int video_markers = 0;
+  float min_lipsync = 0;
+  float max_lipsync = 0;
+  for (frame_index = 0; frame_index < main_state->frame_data->len; frame_index++)
+  {
+    char c = g_array_index(main_state->frame_data, char*, frame_index)
+              [main_state->rgb6_marker_index];
+    if (c == 'k')
+    {
+      if (beep_index < main_state->lipsync_markers->len)
+      {
+        /* Lipsync frame, compare to matching lipsync beep */
+        GstClockTimeDiff frame_time = g_array_index(main_state->frame_times,
+                                                    GstClockTime, frame_index);
+        lipsync_marker_t beep = g_array_index(main_state->lipsync_markers,
+                                              lipsync_marker_t, beep_index++);
+        GstClockTimeDiff beep_start = beep.start_sample * GST_SECOND / 44100;
+        
+        float delta = (float)(beep_start - frame_time) / GST_SECOND;
+        
+        if (video_markers == 0)
+        {
+          min_lipsync = delta;
+          max_lipsync = delta;
+        }
+        else
+        {
+          if (delta < min_lipsync) min_lipsync = delta;
+          if (delta > max_lipsync) max_lipsync = delta;
+        }
+      }
+      
+      video_markers++;
+    }
+  }
+  
+  printf("    Lipsync: %d audio markers, %d video markers\n",
+         main_state->lipsync_markers->len, video_markers);
+  
+  printf("    Audio delay: min %0.1f ms, max %0.1f ms\n",
+         1000 * min_lipsync, 1000 * max_lipsync);
+}
+
+static void save_details(main_state_t *main_state)
+{
+  size_t i;
+  FILE *f;
+  
+  f = fopen("frames.txt", "w");
+  
+  if (!f)
+    return;
+  
+  for (i = 0; i < main_state->frame_data->len; i++)
+  {
+    GstClockTime frame_time = g_array_index(main_state->frame_times, GstClockTime, i);
+    char * frame_data = g_array_index(main_state->frame_data, char*, i);
+    
+    fprintf(f, "%8d %s\n", (int)(frame_time / GST_USECOND), frame_data);
+  }
+  
+  for (i = 0; i < main_state->lipsync_markers->len; i++)
+  {
+    lipsync_marker_t beep = g_array_index(main_state->lipsync_markers, lipsync_marker_t, i);
+    GstClockTime beep_start = beep.start_sample * GST_SECOND / 44100;
+    GstClockTime beep_end = beep.end_sample * GST_SECOND / 44100;
+    
+    fprintf(f, "Beep %8d to %8d, length %8d\n",
+            (int)(beep_start / GST_USECOND),
+            (int)(beep_end / GST_USECOND),
+            (int)((beep_end - beep_start) / GST_USECOND)
+           );
+  }
+  
+  fclose(f);
+  
+  printf("    Saved frame data to frames.txt\n");
 }
 
 int main(int argc, char *argv[])
@@ -201,6 +314,10 @@ int main(int argc, char *argv[])
       g_error_free(error);
       return 3;
     }
+    
+    print_marker_info(&main_state);
+    print_lipsync_info(&main_state);
+    save_details(&main_state);
   }
   
   return 0;

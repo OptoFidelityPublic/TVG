@@ -1,6 +1,6 @@
 oftvg_PROGRAMS = tvg_analyzer
 
-tvg_analyzer_SOURCES = analyzer_main.c loader.c layout.c lipsync.c
+tvg_analyzer_SOURCES = analyzer_main.c loader.c layout.c lipsync.c markertype.c
 
 noinst_HEADERS = loader.h
 
