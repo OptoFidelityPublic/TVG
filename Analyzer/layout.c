@@ -260,3 +260,26 @@ GArray* layout_fetch(layout_t *layout)
   
   return result;
 }
+
+char* layout_read_markers(GArray* markers, const uint8_t *frame, int stride)
+{
+  char *result = g_malloc0(markers->len + 1);
+  const char lookup[] = "krgybmcw";
+  size_t i;
+  
+  for (i = 0; i < markers->len; i++)
+  {
+    marker_t *marker = &g_array_index(markers, marker_t, i);
+    int x = (marker->x1 + marker->x2) / 2;
+    int y = (marker->y1 + marker->y2) / 2;
+    uint8_t color = 0;
+    
+    if (frame[y * stride + x * 4 + 0] > TVG_COLOR_THRESHOLD) color |= 1;
+    if (frame[y * stride + x * 4 + 1] > TVG_COLOR_THRESHOLD) color |= 2;
+    if (frame[y * stride + x * 4 + 2] > TVG_COLOR_THRESHOLD) color |= 4;
+    
+    result[i] = lookup[color];
+  }
+  
+  return result;
+}
