@@ -76,6 +76,40 @@ static void decodebin_pad_added(GstElement *decodebin, GstPad *pad, gpointer dat
   }
 }
 
+/* If the video file is missing video/audio content, remove any extraneous elements */
+static void decodebin_no_more_pads(GstElement *decodebin, GstPad *pad, gpointer data)
+{
+  loader_t *state = (loader_t*)data;
+  
+  {
+    GstPad *audiopad = gst_element_get_static_pad(state->audioconvert, "sink");
+    if (!GST_PAD_IS_LINKED(audiopad))
+    {
+      gst_element_set_state(state->audioconvert, GST_STATE_NULL);
+      gst_element_set_state(state->audiosink, GST_STATE_NULL);
+      gst_bin_remove(GST_BIN(state->pipeline), state->audioconvert);      
+      gst_bin_remove(GST_BIN(state->pipeline), state->audiosink);
+      state->audioconvert = NULL;
+      state->audiosink = NULL;
+    }
+    g_object_unref(audiopad);
+  }
+  
+  {
+    GstPad *videopad = gst_element_get_static_pad(state->videoconvert, "sink");
+    if (!GST_PAD_IS_LINKED(videopad))
+    {
+      gst_element_set_state(state->videoconvert, GST_STATE_NULL);
+      gst_element_set_state(state->videosink, GST_STATE_NULL);
+      gst_bin_remove(GST_BIN(state->pipeline), state->videoconvert);
+      gst_bin_remove(GST_BIN(state->pipeline), state->videosink);
+      state->videoconvert = NULL;
+      state->videosink = NULL;
+    }
+    g_object_unref(videopad);
+  }
+}
+
 /* Keeps track of the number of available audio/video buffers */
 GstFlowReturn new_sample_cb(GstAppSink *appsink, loader_t *state)
 {
@@ -165,6 +199,7 @@ loader_t *loader_open(const gchar *filename, GError **error)
   
   /* The decodebin pads are added dynamically */
   g_signal_connect(state->decodebin, "pad-added", G_CALLBACK(decodebin_pad_added), state);
+  g_signal_connect(state->decodebin, "no-more-pads", G_CALLBACK(decodebin_no_more_pads), state);
   
   /* Try to start the pipeline and check for errors */
   gst_element_set_state(state->pipeline, GST_STATE_PLAYING);
@@ -187,6 +222,11 @@ loader_t *loader_open(const gchar *filename, GError **error)
         }
       }
       gst_message_unref(msg);
+    }
+    else
+    {
+      GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(state->pipeline), GST_DEBUG_GRAPH_SHOW_ALL,
+                            "loader_open_wait");
     }
   }
   
@@ -251,19 +291,83 @@ const gchar *loader_get_audio_decoder(loader_t *state)
 
 void loader_get_resolution(loader_t *state, int *width, int *height, int *stride)
 {
-  GstPad *videopad = gst_element_get_static_pad(state->videosink, "sink");
-  GstCaps *caps = gst_pad_get_current_caps(videopad);
-  GstVideoInfo info;
-  
-  gst_video_info_init(&info);
-  gst_video_info_from_caps(&info, caps);
-  
-  *width = GST_VIDEO_INFO_WIDTH(&info);
-  *height = GST_VIDEO_INFO_HEIGHT(&info);
-  *stride = GST_VIDEO_INFO_COMP_STRIDE(&info, 0);
-  
-  gst_caps_unref(caps);
-  g_object_unref(videopad);
+  if (state->videosink == NULL)
+  {
+    *width = *height = *stride = 0;
+  }
+  else
+  {
+    GstPad *videopad = gst_element_get_static_pad(state->videosink, "sink");
+    GstCaps *caps = gst_pad_get_current_caps(videopad);
+    GstVideoInfo info;
+    
+    gst_video_info_init(&info);
+    gst_video_info_from_caps(&info, caps);
+    
+    *width = GST_VIDEO_INFO_WIDTH(&info);
+    *height = GST_VIDEO_INFO_HEIGHT(&info);
+    *stride = GST_VIDEO_INFO_COMP_STRIDE(&info, 0);
+    
+    gst_caps_unref(caps);
+    g_object_unref(videopad);
+  }
+}
+
+int loader_get_samplerate(loader_t *state)
+{
+  if (state->audiosink == NULL)
+  {
+    return 0;
+  }
+  else
+  {
+    GstPad *audiopad = gst_element_get_static_pad(state->audiosink, "sink");
+    GstCaps *caps = gst_pad_get_current_caps(audiopad);
+    GstAudioInfo info;
+    int result;
+    
+    gst_audio_info_init(&info);
+    gst_audio_info_from_caps(&info, caps);
+    
+    result = GST_AUDIO_INFO_RATE(&info);
+    
+    gst_caps_unref(caps);
+    g_object_unref(audiopad);
+    
+    return result;
+  }
+}
+
+float loader_get_framerate(loader_t *state)
+{
+  if (state->videosink == NULL)
+  {
+    return 0;
+  }
+  else
+  {
+    GstPad *videopad = gst_element_get_static_pad(state->videosink, "sink");
+    GstCaps *caps = gst_pad_get_current_caps(videopad);
+    GstVideoInfo info;
+    float result;
+    
+    gst_video_info_init(&info);
+    gst_video_info_from_caps(&info, caps);
+    
+    if (GST_VIDEO_INFO_FLAG_IS_SET(&info, GST_VIDEO_FLAG_VARIABLE_FPS))
+    {
+      result = 0;
+    }
+    else
+    {
+      result = (float)GST_VIDEO_INFO_FPS_N(&info) / GST_VIDEO_INFO_FPS_D(&info);
+    }
+    
+    gst_caps_unref(caps);
+    g_object_unref(videopad);
+    
+    return result;
+  }
 }
 
 bool loader_get_buffer(loader_t *state, GstBuffer **audio_buf,
@@ -275,8 +379,8 @@ bool loader_get_buffer(loader_t *state, GstBuffer **audio_buf,
   
   do
   {
-    if (gst_app_sink_is_eos(GST_APP_SINK(state->videosink)) &&
-        gst_app_sink_is_eos(GST_APP_SINK(state->audiosink)))
+    if ((state->videosink == NULL || gst_app_sink_is_eos(GST_APP_SINK(state->videosink))) &&
+        (state->audiosink == NULL || gst_app_sink_is_eos(GST_APP_SINK(state->audiosink))))
     {
       /* End of stream and appsinks are empty */
       return false;

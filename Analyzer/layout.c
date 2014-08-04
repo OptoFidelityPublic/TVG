@@ -2,7 +2,11 @@
 #include <stdbool.h>
 #include <zlib.h>
 #include <glib.h>
+#include <gst/gst.h>
 #include <string.h>
+
+GST_DEBUG_CATEGORY_EXTERN(tvg_analyzer_debug);
+#define GST_CAT_DEFAULT tvg_analyzer_debug
 
 struct _layout_t
 {
@@ -85,8 +89,14 @@ void layout_process(layout_t *layout, const uint8_t *frame, int stride)
             max = value;
         }
         
-        if (min != 0 && min != 255 && max != 0 && max != 255)
+        if (min != 0 && max != 255)
         {
+          int r = frame[y * stride + x * 4 + 0];
+          int g = frame[y * stride + x * 4 + 1];
+          int b = frame[y * stride + x * 4 + 2];
+          GST_DEBUG("Marking %d,%d as non-saturated: color #%02x%02x%02x\n",
+                    x, y, r, g, b);
+          
           /* This pixel wasn't fully saturated. */
           layout->saturated[index_pixel] = 0;
         }
@@ -207,8 +217,9 @@ static void find_markers(layout_t *layout, GArray *dest)
           {         
             /* Assign new label */
             label = next_label++;
-            marker_t marker = {x, y, x, y, false};
+            marker_t marker = {x, y, x, y, false, 0};
             marker.is_rgb = !layout->blackwhite[index_pixel];
+            marker.crc = current;
             g_array_append_val(dest, marker);
           }
         }
@@ -245,6 +256,14 @@ static void find_markers(layout_t *layout, GArray *dest)
       
       g_array_remove_index(dest, i - 1);
     }
+  }
+  
+  /* Filter out any too small areas */
+  for (i = dest->len - 1; i >= 0; i--)
+  {
+    marker_t *m = &g_array_index(dest, marker_t, i);
+    if (m->x2 - m->x1 < 16 || m->y2 - m->y1 < 16)
+      g_array_remove_index(dest, i);
   }
   
   g_free(labels);

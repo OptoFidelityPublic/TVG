@@ -126,6 +126,7 @@ static bool detect_bw_mark(videoinfo_t *videoinfo, GArray *frame_data,
   }
   
   /* Figure out the interval for the marker */
+  markerinfo->interval = 0;
   for (i = 0; i < videoinfo->num_content_frames; i++)
   {
     char c = GET_FRAME();
@@ -144,7 +145,13 @@ static bool detect_bw_mark(videoinfo_t *videoinfo, GArray *frame_data,
   for (; i < videoinfo->num_content_frames; i++)
   {
     char c = GET_FRAME();
-    char expected = (i % (markerinfo->interval * 2) < markerinfo->interval) ? 'k' : 'w';
+    char expected;
+    
+    if (markerinfo->interval > 0)
+      expected = (i % (markerinfo->interval * 2) < markerinfo->interval) ? 'k' : 'w';
+    else
+      expected = 'k';
+      
     if (c != expected)
       return false;
   }
@@ -215,10 +222,15 @@ static bool detect_rgb6_mark(videoinfo_t *videoinfo, GArray *frame_data,
 }
 
 videoinfo_t *markertype_analyze(GArray *frame_data)
-{
+{  
   int i;
   videoinfo_t *videoinfo = g_malloc0(sizeof(videoinfo_t));
-  videoinfo->num_markers = strlen(g_array_index(frame_data, char*, 0));
+ 
+  if (frame_data->len > 0)
+  {
+    videoinfo->num_markers = strlen(g_array_index(frame_data, char*, 0));
+  }
+  
   videoinfo->markerinfo = g_malloc0(sizeof(markerinfo_t) * videoinfo->num_markers);
   
   count_header_frames(videoinfo, frame_data);

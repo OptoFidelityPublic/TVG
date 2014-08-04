@@ -23,6 +23,7 @@ typedef struct _marker_t {
   int x2;
   int y2;
   bool is_rgb;
+  uint32_t crc;
 } marker_t;
 
 /* Create a new context for the layout detector */

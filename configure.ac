@@ -30,7 +30,8 @@ PKG_CHECK_MODULES([GST],
     gstreamer-plugins-base-1.0 >= $GST_REQ
     gstreamer-app-1.0 >= $GST_REQ
     gstreamer-pbutils-1.0 >= $GST_REQ
-    gstreamer-video-1.0 >= $GST_REQ],
+    gstreamer-video-1.0 >= $GST_REQ
+    gstreamer-audio-1.0 >= $GST_REQ],
     [AC_SUBST(GST_CFLAGS) AC_SUBST(GST_LIBS)]
 )
 

@@ -6,6 +6,9 @@
 #include "lipsync.h"
 #include "markertype.h"
 
+GST_DEBUG_CATEGORY(tvg_analyzer_debug);
+#define GST_CAT_DEFAULT tvg_analyzer_debug
+
 typedef struct {
   const char *filename;
   GArray *markers; /* marker_t, detected markers */
@@ -14,6 +17,7 @@ typedef struct {
   GArray *frame_data; /* char*, detected marker states in frames */
   GArray *frame_times; /* GstClockTime */
   int rgb6_marker_index; /* Index of the RGB6 marker */
+  int samplerate; /* Audio samplerate */
 } main_state_t;
 
 /* First pass through the input video:
@@ -25,6 +29,7 @@ bool first_pass(main_state_t *main_state, GError **error)
   int width, height, stride;
   layout_t *layout_state;
   loader_t *loader_state;
+  float framerate;
   
   *error = NULL;
   loader_state = loader_open(main_state->filename, error);
@@ -32,12 +37,19 @@ bool first_pass(main_state_t *main_state, GError **error)
     return false;
   
   loader_get_resolution(loader_state, &width, &height, &stride);
+  main_state->samplerate = loader_get_samplerate(loader_state);
+  framerate = loader_get_framerate(loader_state);
   
   printf("File %s:\n", main_state->filename); 
   printf("    Demuxer:          %s\n", loader_get_demux(loader_state));
   printf("    Video codec:      %s\n", loader_get_video_decoder(loader_state));
   printf("    Audio codec:      %s\n", loader_get_audio_decoder(loader_state));
   printf("    Video resolution: %dx%d\n", width, height);
+  
+  if (framerate != 0)
+    printf("    Framerate:        %0.2f\n", framerate);
+  else
+    printf("    Framerate:        variable\n");
   
   layout_state = layout_create(width, height);
   
@@ -52,6 +64,7 @@ bool first_pass(main_state_t *main_state, GError **error)
       
       if (isatty(1))
       {
+        GST_INFO("Processing frame %d\n", num_frames);
         printf("[%5d]  \r", num_frames);
         fflush(stdout);
       }
@@ -107,7 +120,7 @@ bool second_pass(main_state_t *main_state, GError **error)
   
   loader_get_resolution(loader_state, &width, &height, &stride);
   
-  lipsync_state = lipsync_create(44100);
+  lipsync_state = lipsync_create(main_state->samplerate);
   main_state->frame_data = g_array_new(false, false, sizeof(char*));
   main_state->frame_times = g_array_new(false, false, sizeof(GstClockTime));
   
@@ -174,9 +187,11 @@ static void print_marker_info(main_state_t *main_state)
     marker_t *marker = &g_array_index(main_state->markers, marker_t, i);
     markerinfo_t *info = &videoinfo->markerinfo[i];
     
-    printf("      Marker %3d: at (%4d,%4d) size %dx%d", (int)i,
+    printf("      Marker %3d:     at (%4d,%4d) size %3dx%-3d crc %08x", (int)i,
             marker->x1, marker->y1,
-            marker->x2 - marker->x1 + 1, marker->y2 - marker->y1 + 1);
+            marker->x2 - marker->x1 + 1, marker->y2 - marker->y1 + 1,
+            marker->crc
+          );
     
     if (info->type == TVG_MARKER_SYNCMARK)
       printf(" type SYNCMARK interval %d\n", info->interval);
@@ -191,10 +206,11 @@ static void print_marker_info(main_state_t *main_state)
       main_state->rgb6_marker_index = i;
   }
   
-  printf("    Number of header frames:  %5d\n", videoinfo->num_header_frames);
-  printf("    Number of locator frames: %5d\n", videoinfo->num_locator_frames);
-  printf("    Number of content frames: %5d\n", videoinfo->num_content_frames);
-  printf("    Number of trailer frames: %5d\n", videoinfo->num_trailer_frames);
+  printf("    Video structure:\n");
+  printf("      Header:       %5d frames\n", videoinfo->num_header_frames);
+  printf("      Locator:      %5d frames\n", videoinfo->num_locator_frames);
+  printf("      Content:      %5d frames\n", videoinfo->num_content_frames);
+  printf("      Trailer:      %5d frames\n", videoinfo->num_trailer_frames);
   
   markertype_free(videoinfo);
 }
@@ -220,7 +236,7 @@ static void print_lipsync_info(main_state_t *main_state)
                                                     GstClockTime, frame_index);
         lipsync_marker_t beep = g_array_index(main_state->lipsync_markers,
                                               lipsync_marker_t, beep_index++);
-        GstClockTimeDiff beep_start = beep.start_sample * GST_SECOND / 44100;
+        GstClockTimeDiff beep_start = beep.start_sample * GST_SECOND / main_state->samplerate;
         
         float delta = (float)(beep_start - frame_time) / GST_SECOND;
         
@@ -240,16 +256,19 @@ static void print_lipsync_info(main_state_t *main_state)
     }
   }
   
-  printf("    Lipsync: %d audio markers, %d video markers\n",
+  printf("    Lipsync:          %d audio markers, %d video markers\n",
          main_state->lipsync_markers->len, video_markers);
   
-  printf("    Audio delay: min %0.1f ms, max %0.1f ms\n",
-         1000 * min_lipsync, 1000 * max_lipsync);
+  if (main_state->lipsync_markers->len > 0 && video_markers > 0)
+  {
+    printf("    Audio delay:      min %0.1f ms, max %0.1f ms\n",
+           1000 * min_lipsync, 1000 * max_lipsync);
+  }
 }
 
 static void save_details(main_state_t *main_state)
 {
-  size_t i;
+  size_t frame_index, lipsync_index = 0;
   FILE *f;
   
   f = fopen("frames.txt", "w");
@@ -257,25 +276,29 @@ static void save_details(main_state_t *main_state)
   if (!f)
     return;
   
-  for (i = 0; i < main_state->frame_data->len; i++)
+  for (frame_index = 0; frame_index < main_state->frame_data->len; frame_index++)
   {
-    GstClockTime frame_time = g_array_index(main_state->frame_times, GstClockTime, i);
-    char * frame_data = g_array_index(main_state->frame_data, char*, i);
+    GstClockTime frame_time = g_array_index(main_state->frame_times, GstClockTime, frame_index);
+    char * frame_data = g_array_index(main_state->frame_data, char*, frame_index);
     
-    fprintf(f, "%8d %s\n", (int)(frame_time / GST_USECOND), frame_data);
-  }
-  
-  for (i = 0; i < main_state->lipsync_markers->len; i++)
-  {
-    lipsync_marker_t beep = g_array_index(main_state->lipsync_markers, lipsync_marker_t, i);
-    GstClockTime beep_start = beep.start_sample * GST_SECOND / 44100;
-    GstClockTime beep_end = beep.end_sample * GST_SECOND / 44100;
+    if (lipsync_index < main_state->lipsync_markers->len)
+    {
+      lipsync_marker_t beep = g_array_index(main_state->lipsync_markers, lipsync_marker_t, lipsync_index);
+      GstClockTime beep_start = beep.start_sample * GST_SECOND / main_state->samplerate;
+      GstClockTime beep_end = beep.end_sample * GST_SECOND / main_state->samplerate;
+      
+      if (beep_start <= frame_time)
+      {
+        fprintf(f, "AUDIO: %8d %5d\n",
+                (int)(beep_start / GST_USECOND),
+                (int)((beep_end - beep_start) / GST_USECOND)
+              );
+        lipsync_index++;
+      }
+    }
     
-    fprintf(f, "Beep %8d to %8d, length %8d\n",
-            (int)(beep_start / GST_USECOND),
-            (int)(beep_end / GST_USECOND),
-            (int)((beep_end - beep_start) / GST_USECOND)
-           );
+    
+    fprintf(f, "VIDEO: %8d %s\n", (int)(frame_time / GST_USECOND), frame_data);    
   }
   
   fclose(f);
@@ -287,6 +310,7 @@ int main(int argc, char *argv[])
 {
   /* Initialize gstreamer. Will handle any gst-specific commandline options. */
   gst_init(&argc, &argv);
+  GST_DEBUG_CATEGORY_INIT (tvg_analyzer_debug, "tvg_analyzer", 0, "OF TVG Video Analyzer");
   
   /* There should be only one remaining argument. */
   if (argc != 2)
