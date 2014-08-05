@@ -358,6 +358,10 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   GstClockTime buffer_end_time = GST_BUFFER_PTS(buf) + GST_BUFFER_DURATION(buf);
   state_t prev_state = filter->state;
   
+  GST_DEBUG("Video buffer: %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT "\n",
+              GST_TIME_ARGS(GST_BUFFER_PTS(buf)),
+              GST_TIME_ARGS(GST_BUFFER_PTS(buf) + GST_BUFFER_DURATION(buf)));
+  
   if (!filter->silent && filter->state == STATE_VIDEO)
   {
     /* Show progress once a second */
