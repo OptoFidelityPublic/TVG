@@ -3,6 +3,7 @@
  * - Marker colors are always saturated RGB on every frame.
  * - One marker always has the same color over its whole area.
  * - Each marker changes color atleast once during the video.
+ * - When the pixel changes color, the change should be large and sudden.
  */
 
 #ifndef _TVG_LAYOUT_DETECTOR_H_

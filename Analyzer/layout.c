@@ -4,6 +4,7 @@
 #include <glib.h>
 #include <gst/gst.h>
 #include <string.h>
+#include <stdlib.h>
 
 GST_DEBUG_CATEGORY_EXTERN(tvg_analyzer_debug);
 #define GST_CAT_DEFAULT tvg_analyzer_debug
@@ -13,8 +14,8 @@ struct _layout_t
   int width;
   int height;
   
-  /* Pixel mask of the pixels that are fully saturated. */
-  uint8_t *saturated;
+  /* Pixel mask of the pixels that are good so far. */
+  uint8_t *good_mask;
   
   /* Pixel mask of the pixels that are black/white. */
   uint8_t *blackwhite;
@@ -25,6 +26,9 @@ struct _layout_t
   
   /* Pixel color checksums to detect connected areas. */
   uint32_t *pixel_crcs;
+  
+  /* Pixel color after the previous large change. */
+  uint32_t *pixel_colors;
 };
 
 layout_t *layout_create(int width, int height)
@@ -34,24 +38,26 @@ layout_t *layout_create(int width, int height)
   layout->width = width;
   layout->height = height;
   
-  layout->saturated = g_malloc(width * height);
+  layout->good_mask = g_malloc(width * height);
   layout->blackwhite = g_malloc(width * height);
   layout->min_values = g_malloc(width * height * 4);
   layout->max_values = g_malloc(width * height * 4);
   layout->pixel_crcs = g_malloc(width * height * 4);
+  layout->pixel_colors = g_malloc(width * height * 4);
   
-  memset(layout->saturated, 1, width * height);
+  memset(layout->good_mask, 1, width * height);
   memset(layout->blackwhite, 1, width * height);
   memset(layout->min_values, 255, width * height * 4);
   memset(layout->max_values, 0, width * height * 4);
   memset(layout->pixel_crcs, 1, width * height * 4);
+  memset(layout->pixel_colors, 1, width * height * 4);
   
   return layout;
 }
 
 void layout_free(layout_t *layout)
 {
-  g_free(layout->saturated);  layout->saturated = NULL;
+  g_free(layout->good_mask);  layout->good_mask = NULL;
   g_free(layout->blackwhite);  layout->blackwhite = NULL;
   g_free(layout->min_values); layout->min_values = NULL;
   g_free(layout->max_values); layout->max_values = NULL;
@@ -66,9 +72,9 @@ void layout_process(layout_t *layout, const uint8_t *frame, int stride)
   {
     for (x = 0; x < layout->width; x++)
     {
-      /* We only care about the saturated pixels */
+      /* Don't recheck pixels that have already been ruled out. */
       int index_pixel = y * layout->width + x;
-      if (layout->saturated[index_pixel])
+      if (layout->good_mask[index_pixel])
       {
         int min = 255;
         int max = 0;
@@ -89,34 +95,61 @@ void layout_process(layout_t *layout, const uint8_t *frame, int stride)
             max = value;
         }
         
-        if (min != 0 && max != 255)
         {
           int r = frame[y * stride + x * 4 + 0];
           int g = frame[y * stride + x * 4 + 1];
           int b = frame[y * stride + x * 4 + 2];
-          GST_DEBUG("Marking %d,%d as non-saturated: color #%02x%02x%02x\n",
-                    x, y, r, g, b);
+          uint8_t color = 0;
+          if (r > TVG_COLOR_THRESHOLD) color |= 1;
+          if (g > TVG_COLOR_THRESHOLD) color |= 2;
+          if (b > TVG_COLOR_THRESHOLD) color |= 4;
           
-          /* This pixel wasn't fully saturated. */
-          layout->saturated[index_pixel] = 0;
-        }
-        
-        /* Update CRC32 of the pixel in order to detect joined areas.
-         * Uses only the saturated pixel value in order to be tolerant of
-         * lossy compression. */
-        {
-          uint8_t sat[3] = {
-            frame[y * stride + x * 4 + 0] > TVG_COLOR_THRESHOLD,
-            frame[y * stride + x * 4 + 1] > TVG_COLOR_THRESHOLD,
-            frame[y * stride + x * 4 + 2] > TVG_COLOR_THRESHOLD
-          };
-          
-          layout->pixel_crcs[index_pixel] = crc32(layout->pixel_crcs[index_pixel],
-                                                  sat, 3);
-          
-          if (sat[0] != sat[1] || sat[1] != sat[2])
+          if (min > 5 && max < 250)
           {
-            layout->blackwhite[index_pixel] = 0;
+            GST_DEBUG("Marking %d,%d as non-saturated: color #%02x%02x%02x\n",
+                      x, y, r, g, b);
+            
+            /* This pixel wasn't fully saturated. */
+            layout->good_mask[index_pixel] = 0;
+          }
+          
+          /* Update CRC32 of the pixel in order to detect joined areas.
+           * Uses only the saturated pixel value in order to be tolerant of
+           * lossy compression. */
+          {
+            layout->pixel_crcs[index_pixel] = crc32(layout->pixel_crcs[index_pixel],
+                                                    &color, 1);
+            
+            if (color != 0 && color != 7)
+            {
+              layout->blackwhite[index_pixel] = 0;
+            }
+          }
+          
+          /* Check if the pixel value has changed */
+          {
+            int old_value = layout->pixel_colors[index_pixel];
+            int new_value = (color << 24) | (r << 16) | (g << 8) | b;
+            
+            if ((old_value >> 24) != (new_value >> 24))
+            {
+              /* Ok, large change, update value */
+              layout->pixel_colors[index_pixel] = new_value;
+            }
+            else
+            {
+              /* There shouldn't be much change in the value */
+              int delta_r = abs(r - ((old_value >> 16) & 0xFF));
+              int delta_g = abs(g - ((old_value >>  8) & 0xFF));
+              int delta_b = abs(b - ((old_value >>  0) & 0xFF));
+              if (delta_r + delta_g + delta_b > 20)
+              {
+                GST_DEBUG("Marking %d,%d as slowly changing: old %08x, new %08x\n",
+                      x, y, old_value, new_value);
+                
+                layout->good_mask[index_pixel] = 0;
+              }
+            }
           }
         }
       }
@@ -140,12 +173,14 @@ static void filter_crcs(layout_t *layout)
       if (layout->pixel_crcs[index_pixel] == 0)
         layout->pixel_crcs[index_pixel] = 1;
       
-      if (layout->saturated[index_pixel] == 0)
+      if (layout->good_mask[index_pixel] == 0)
       {
         /* Not saturated */
         layout->pixel_crcs[index_pixel] = 0;
+        continue;
       }
-      else
+      
+      /* Rule out constant valued pixels */
       {
         uint8_t min1 = layout->min_values[index_pixel * 4 + 0];
         uint8_t max1 = layout->max_values[index_pixel * 4 + 0];
