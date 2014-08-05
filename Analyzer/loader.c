@@ -281,7 +281,10 @@ const gchar *loader_get_demux(loader_t *state)
 
 const gchar *loader_get_video_decoder(loader_t *state)
 {
-  return get_element_name_with_klass(state, "Decoder/Video");
+  const gchar *result = get_element_name_with_klass(state, "Decoder/Video");
+  if (!result)
+    result = get_element_name_with_klass(state, "Decoder/Image");
+  return result;
 }
 
 const gchar *loader_get_audio_decoder(loader_t *state)
