@@ -50,7 +50,7 @@ layout_t *layout_create(int width, int height)
   memset(layout->min_values, 255, width * height * 4);
   memset(layout->max_values, 0, width * height * 4);
   memset(layout->pixel_crcs, 1, width * height * 4);
-  memset(layout->pixel_colors, 1, width * height * 4);
+  memset(layout->pixel_colors, 0, width * height * 4);
   
   return layout;
 }
