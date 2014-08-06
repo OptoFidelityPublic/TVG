@@ -55,6 +55,7 @@ bool first_pass(main_state_t *main_state, GError **error)
   
   int num_frames = 0;
   GstBuffer *audio_buf, *video_buf;
+  GstClockTime video_start_time = GST_CLOCK_TIME_NONE, audio_start_time = GST_CLOCK_TIME_NONE;
   GstClockTime video_end_time = 0, audio_end_time = 0;
   while (loader_get_buffer(loader_state, &audio_buf, &video_buf, error))
   {
@@ -76,12 +77,41 @@ bool first_pass(main_state_t *main_state, GError **error)
         gst_buffer_unmap(video_buf, &mapinfo);
       }
       
+      if (!GST_CLOCK_TIME_IS_VALID(video_start_time))
+      {
+        /* First frame */
+        video_start_time = video_buf->pts;
+      }
+      else
+      {
+        GstClockTimeDiff delta = GST_CLOCK_DIFF(video_end_time, video_buf->pts);
+        if (delta < -GST_MSECOND || delta > GST_MSECOND)
+        {
+          printf("    WARNING: Gap in video times (frame %d, offset = %0.3f s)\n",
+                 num_frames, (float)delta / GST_SECOND);
+        }
+      }
+      
       video_end_time = video_buf->pts + video_buf->duration;
       gst_buffer_unref(video_buf);
     }
     
     if (audio_buf != NULL)
     {
+      if (!GST_CLOCK_TIME_IS_VALID(audio_start_time))
+      {
+        audio_start_time = audio_buf->pts;
+      }
+      else
+      {
+        GstClockTimeDiff delta = GST_CLOCK_DIFF(audio_end_time, audio_buf->pts);
+        if (delta < -GST_MSECOND || delta > GST_MSECOND)
+        {
+          printf("    WARNING: Gap in audio times (at %0.3f s, offset = %0.3f s)\n",
+                 (float)audio_end_time / GST_SECOND, (float)delta / GST_SECOND);
+        }
+      }
+      
       audio_end_time = audio_buf->pts + audio_buf->duration;
       gst_buffer_unref(audio_buf);
     }
@@ -94,6 +124,18 @@ bool first_pass(main_state_t *main_state, GError **error)
   printf("    Number of frames: %d (total)\n", num_frames);
   printf("    Video length:     %0.3f s\n", (float)video_end_time / GST_SECOND);
   printf("    Audio length:     %0.3f s\n", (float)audio_end_time / GST_SECOND);
+  
+  if (video_start_time > GST_MSECOND)
+  {
+    printf("    WARNING: Video time does not start from 0 (offset = %0.3f s)\n",
+          (float)video_start_time / GST_SECOND);
+  }
+  
+  if (audio_start_time > GST_MSECOND)
+  {
+    printf("    WARNING: Audio time does not start from 0 (offset = %0.3f s)\n",
+          (float)audio_start_time / GST_SECOND);
+  }
   
   main_state->markers = layout_fetch(layout_state);
   printf("    Markers found:    %d\n", main_state->markers->len);
