@@ -142,7 +142,7 @@ void layout_process(layout_t *layout, const uint8_t *frame, int stride)
               int delta_r = abs(r - ((old_value >> 16) & 0xFF));
               int delta_g = abs(g - ((old_value >>  8) & 0xFF));
               int delta_b = abs(b - ((old_value >>  0) & 0xFF));
-              if (delta_r + delta_g + delta_b > 20)
+              if (delta_r + delta_g + delta_b > 32)
               {
                 GST_DEBUG("Marking %d,%d as slowly changing: old %08x, new %08x\n",
                       x, y, old_value, new_value);
