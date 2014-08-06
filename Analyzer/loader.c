@@ -261,8 +261,7 @@ static const gchar *get_element_name_with_klass(loader_t *state, const gchar *wa
     
     if (strstr(klass, wanted_klass))
     {
-      result = gst_element_class_get_metadata(eclass,
-                                              GST_ELEMENT_METADATA_LONGNAME);
+      result = GST_OBJECT_NAME(gst_element_get_factory(element));
       done = true;
     }
     
