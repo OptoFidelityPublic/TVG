@@ -16,6 +16,7 @@ typedef struct {
   GArray *lipsync_markers; /* lipsync_marker_t, detected beeps */
   GArray *frame_data; /* char*, detected marker states in frames */
   GArray *frame_times; /* GstClockTime */
+  GArray *warnings;
   int rgb6_marker_index; /* Index of the RGB6 marker */
   int samplerate; /* Audio samplerate */
 } main_state_t;
@@ -40,16 +41,17 @@ bool first_pass(main_state_t *main_state, GError **error)
   main_state->samplerate = loader_get_samplerate(loader_state);
   framerate = loader_get_framerate(loader_state);
   
-  printf("File %s:\n", main_state->filename); 
-  printf("    Demuxer:          %s\n", loader_get_demux(loader_state));
-  printf("    Video codec:      %s\n", loader_get_video_decoder(loader_state));
-  printf("    Audio codec:      %s\n", loader_get_audio_decoder(loader_state));
-  printf("    Video resolution: %dx%d\n", width, height);
+  printf("{\n");
+  printf("    \"file\":         \"%s\",\n", main_state->filename); 
+  printf("    \"demuxer\":      \"%s\",\n", loader_get_demux(loader_state));
+  printf("    \"video_codec\":  \"%s\",\n", loader_get_video_decoder(loader_state));
+  printf("    \"audio_codec\":  \"%s\",\n", loader_get_audio_decoder(loader_state));
+  printf("    \"resolution\":   [%d,%d],\n", width, height);
   
   if (framerate != 0)
-    printf("    Framerate:        %0.2f\n", framerate);
+    printf("    \"framerate\":    %8.2f,\n", framerate);
   else
-    printf("    Framerate:        variable\n");
+    printf("    \"framerate\":    \"variable\",\n");
   
   layout_state = layout_create(width, height);
   
@@ -87,8 +89,10 @@ bool first_pass(main_state_t *main_state, GError **error)
         GstClockTimeDiff delta = GST_CLOCK_DIFF(video_end_time, video_buf->pts);
         if (delta < -GST_MSECOND || delta > GST_MSECOND)
         {
-          printf("    WARNING: Gap in video times (frame %d, offset = %0.3f s)\n",
+          gchar* m = g_strdup_printf(
+                 "Gap in video times (frame %d, offset = %0.3f s)",
                  num_frames, (float)delta / GST_SECOND);
+          g_array_append_val(main_state->warnings, m);
         }
       }
       
@@ -107,8 +111,10 @@ bool first_pass(main_state_t *main_state, GError **error)
         GstClockTimeDiff delta = GST_CLOCK_DIFF(audio_end_time, audio_buf->pts);
         if (delta < -GST_MSECOND || delta > GST_MSECOND)
         {
-          printf("    WARNING: Gap in audio times (at %0.3f s, offset = %0.3f s)\n",
+          gchar* m = g_strdup_printf(
+                 "Gap in audio times (at %0.3f s, offset = %0.3f s)",
                  (float)audio_end_time / GST_SECOND, (float)delta / GST_SECOND);
+          g_array_append_val(main_state->warnings, m);
         }
       }
       
@@ -121,24 +127,28 @@ bool first_pass(main_state_t *main_state, GError **error)
   }
   
   main_state->num_frames = num_frames;
-  printf("    Number of frames: %d (total)\n", num_frames);
-  printf("    Video length:     %0.3f s\n", (float)video_end_time / GST_SECOND);
-  printf("    Audio length:     %0.3f s\n", (float)audio_end_time / GST_SECOND);
+  printf("    \"total_frames\": %8d,\n", num_frames);
+  printf("    \"video_length\": %8.3f,\n", (float)video_end_time / GST_SECOND);
+  printf("    \"audio_length\": %8.3f,\n", (float)audio_end_time / GST_SECOND);
   
   if (video_start_time > GST_MSECOND)
   {
-    printf("    WARNING: Video time does not start from 0 (offset = %0.3f s)\n",
-          (float)video_start_time / GST_SECOND);
+    gchar* m = g_strdup_printf(
+      "Video time does not start from 0 (offset = %0.3f s)",
+      (float)video_start_time / GST_SECOND);
+    g_array_append_val(main_state->warnings, m);          
   }
   
   if (audio_start_time > GST_MSECOND)
   {
-    printf("    WARNING: Audio time does not start from 0 (offset = %0.3f s)\n",
-          (float)audio_start_time / GST_SECOND);
+    gchar* m = g_strdup_printf(
+      "Audio time does not start from 0 (offset = %0.3f s)",
+      (float)audio_start_time / GST_SECOND);
+    g_array_append_val(main_state->warnings, m);    
   }
   
   main_state->markers = layout_fetch(layout_state);
-  printf("    Markers found:    %d\n", main_state->markers->len);
+  printf("    \"markers_found\":%8d,\n", main_state->markers->len);
   
   loader_close(loader_state);
   layout_free(layout_state);
@@ -223,36 +233,46 @@ static void print_marker_info(main_state_t *main_state)
   videoinfo_t *videoinfo = markertype_analyze(main_state->frame_data);
   size_t i;
   
+  printf("    \"markers\": [\n");
+  
   main_state->rgb6_marker_index = -1;
   for (i = 0; i < main_state->markers->len; i++)
   {
     marker_t *marker = &g_array_index(main_state->markers, marker_t, i);
     markerinfo_t *info = &videoinfo->markerinfo[i];
     
-    printf("      Marker %3d:     at (%4d,%4d) size %3dx%-3d crc %08x", (int)i,
-            marker->x1, marker->y1,
-            marker->x2 - marker->x1 + 1, marker->y2 - marker->y1 + 1,
-            marker->crc
+    printf("      {\"index\": %3d, \"pos\": [%4d,%4d], \"size\": [%3d,%3d], \"crc\": \"%08x\", ",
+           (int)i, marker->x1, marker->y1,
+           marker->x2 - marker->x1 + 1, marker->y2 - marker->y1 + 1,
+           marker->crc
           );
     
     if (info->type == TVG_MARKER_SYNCMARK)
-      printf(" type SYNCMARK interval %d\n", info->interval);
+      printf("\"type\": \"SYNCMARK\", \"interval\": %d", info->interval);
     else if (info->type == TVG_MARKER_FRAMEID)
-      printf(" type FRAMEID interval %d\n", info->interval);
+      printf("\"type\": \"FRAMEID\", \"interval\": %d", info->interval);
     else if (info->type == TVG_MARKER_RGB6)
-      printf(" type RGB6\n");
+      printf("\"type\": \"RGB6\"");
     else
-      printf(" type UNKNOWN\n");
+      printf("\"type\": \"UNKNOWN\"");
+    
+    if (i == main_state->markers->len - 1)
+      printf("}\n");
+    else
+      printf("},\n");
     
     if (info->type == TVG_MARKER_RGB6)
       main_state->rgb6_marker_index = i;
   }
   
-  printf("    Video structure:\n");
-  printf("      Header:       %5d frames\n", videoinfo->num_header_frames);
-  printf("      Locator:      %5d frames\n", videoinfo->num_locator_frames);
-  printf("      Content:      %5d frames\n", videoinfo->num_content_frames);
-  printf("      Trailer:      %5d frames\n", videoinfo->num_trailer_frames);
+  printf("    ],\n");
+  
+  printf("    \"video_structure\": {\n");
+  printf("      \"header_frames\": %8d,\n", videoinfo->num_header_frames);
+  printf("      \"locator_frames\":%8d,\n", videoinfo->num_locator_frames);
+  printf("      \"content_frames\":%8d,\n", videoinfo->num_content_frames);
+  printf("      \"trailer_frames\":%8d\n", videoinfo->num_trailer_frames);
+  printf("    },\n");
   
   markertype_free(videoinfo);
 }
@@ -298,14 +318,17 @@ static void print_lipsync_info(main_state_t *main_state)
     }
   }
   
-  printf("    Lipsync:          %d audio markers, %d video markers\n",
-         main_state->lipsync_markers->len, video_markers);
+  printf("    \"lipsync\": {\n");
+  printf("      \"audio_markers\":    %8d,\n", main_state->lipsync_markers->len);
+  printf("      \"video_markers\":    %8d", video_markers);
   
   if (main_state->lipsync_markers->len > 0 && video_markers > 0)
   {
-    printf("    Audio delay:      min %0.1f ms, max %0.1f ms\n",
-           1000 * min_lipsync, 1000 * max_lipsync);
+    printf(",\n");
+    printf("      \"audio_delay_min_ms\": %6.1f,\n", 1000 * min_lipsync);
+    printf("      \"audio_delay_max_ms\": %6.1f", 1000 * max_lipsync);
   }
+  printf("\n    },\n");
 }
 
 static void save_details(main_state_t *main_state)
@@ -345,11 +368,13 @@ static void save_details(main_state_t *main_state)
   
   fclose(f);
   
-  printf("    Saved frame data to frames.txt\n");
+  printf("    \"frame_data\": \"frames.txt\",\n");
 }
 
 int main(int argc, char *argv[])
 {
+  size_t i;
+  
   /* Initialize gstreamer. Will handle any gst-specific commandline options. */
   gst_init(&argc, &argv);
   GST_DEBUG_CATEGORY_INIT (tvg_analyzer_debug, "tvg_analyzer", 0, "OF TVG Video Analyzer");
@@ -366,6 +391,7 @@ int main(int argc, char *argv[])
     GError *error = NULL;
     
     main_state.filename = argv[1];
+    main_state.warnings = g_array_new(false, false, sizeof(char*));
     
     if (!first_pass(&main_state, &error))
     {
@@ -384,6 +410,16 @@ int main(int argc, char *argv[])
     print_marker_info(&main_state);
     print_lipsync_info(&main_state);
     save_details(&main_state);
+    
+    printf("    \"warnings\": [\n");
+    for (i = 0; i < main_state.warnings->len; i++)
+    {
+      printf("      \"%s\"%s\n",
+             g_array_index(main_state.warnings, char*, i),
+             (i == main_state.warnings->len - 1) ? "" : ",");
+    }
+    printf("    ]\n");
+    printf("}\n");
   }
   
   return 0;
