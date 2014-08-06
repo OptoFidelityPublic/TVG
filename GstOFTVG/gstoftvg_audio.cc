@@ -121,6 +121,8 @@ static gboolean gst_oftvg_audio_start(GstBaseTransform* object)
   GstOFTVG_Audio *filter = GST_OFTVG_AUDIO(object);
   filter->current = NULL;
   filter->phase = 0;
+  filter->end_of_stream = false;
+  filter->first = true;
   return TRUE;
 }
 
@@ -203,15 +205,22 @@ GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf
   int offset = 0;
   int num_channels = 2;
   int buflen = gst_buffer_get_size(buf) / sizeof(gint16) / num_channels;
-  bool end_of_stream = false;
   
   GST_DEBUG("Incoming buffer: %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT " (%d samples)",
             GST_TIME_ARGS(GST_BUFFER_PTS(buf)),
             GST_TIME_ARGS(GST_BUFFER_PTS(buf) + GST_BUFFER_DURATION(buf)),
             buflen);
   
+  if (filter->first && GST_BUFFER_PTS(buf) > GST_MSECOND)
+  {
+    g_print("WARNING: Input audio does not start at time zero (offset = %0.3f s). "
+            "This can cause A/V sync issues with some video formats.\n",
+            (float)GST_BUFFER_PTS(buf) / GST_SECOND);
+  }
+  filter->first = false;
+  
   /* Repeat until the whole buffer has been processed */
-  while (offset < buflen && !end_of_stream)
+  while (offset < buflen && !filter->end_of_stream)
   {
     /* Calculate timestamp at this offset */
     GstClockTime start_time = GST_BUFFER_PTS(buf) + GST_SECOND * offset / SAMPLERATE;
@@ -236,7 +245,8 @@ GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf
       {
         /* G_MAXINT64 tells us that the video stream has ended */
         GST_DEBUG("End of audio stream");
-        end_of_stream = true;
+        filter->end_of_stream = true;
+        break;
       }
       else if (filter->current->start == filter->current->end)
       {
@@ -287,10 +297,13 @@ GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf
     offset = start_offset + num_samples;
   }
   
-  if (end_of_stream)
+  if (filter->end_of_stream)
   {
-    g_free(filter->current);
-    filter->current = NULL;
+    if (filter->current)
+    {
+      g_free(filter->current);
+      filter->current = NULL;
+    }
     return GST_FLOW_EOS;
   }
   else

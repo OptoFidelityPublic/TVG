@@ -23,6 +23,7 @@
 
 #include <gst/gst.h>
 #include <gst/base/gstpushsrc.h>
+#include <stdbool.h>
 
 /* Declaration of the GObject subtype */
 G_BEGIN_DECLS
@@ -53,6 +54,8 @@ struct _GstOFTVG_Audio
   /* Currently active event */
   beep_t *current;
   int phase;
+  bool end_of_stream;
+  bool first;
 };
 
 struct _GstOFTVG_AudioClass 

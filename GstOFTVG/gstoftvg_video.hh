@@ -24,6 +24,7 @@
 #include <gst/gst.h>
 #include <gst/base/gstbasetransform.h>
 #include <gst/video/video.h>
+#include <stdbool.h>
 
 /* List of properties understood by the GstOFTVG_Video element.
  * Each entry contains:
@@ -77,6 +78,9 @@ struct _GstOFTVG_Video
   /* Count of frames processed so far in STATE_VIDEO.
    * Used as the frame id (starts from 0). */
   int frame_counter;
+  
+  /* Is the next buffer the first in the video stream? */
+  bool first;
   
   /* Timestamp of last state change */
   GstClockTime last_state_change;

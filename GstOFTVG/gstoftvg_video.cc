@@ -258,6 +258,7 @@ static gboolean gst_oftvg_video_start(GstBaseTransform* object)
 {
   GstOFTVG_Video *filter = GST_OFTVG_VIDEO(object);
   filter->frame_counter = 0;
+  filter->first = true;
   filter->last_state_change = 0;
   filter->end_of_video = G_MAXINT64;
   filter->progress_timestamp = 0;
@@ -361,6 +362,14 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   GST_DEBUG("Video buffer: %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT "\n",
               GST_TIME_ARGS(GST_BUFFER_PTS(buf)),
               GST_TIME_ARGS(GST_BUFFER_PTS(buf) + GST_BUFFER_DURATION(buf)));
+  
+  if (filter->first && GST_BUFFER_PTS(buf) > GST_MSECOND)
+  {
+    g_print("WARNING: Input video does not start at time zero (offset = %0.3f s). "
+            "This can cause A/V sync issues with some video formats.\n",
+            (float)GST_BUFFER_PTS(buf) / GST_SECOND);
+  }
+  filter->first = false;
   
   if (!filter->silent && filter->state == STATE_VIDEO)
   {
