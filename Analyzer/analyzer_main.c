@@ -67,7 +67,8 @@ bool first_pass(main_state_t *main_state, GError **error)
       
       if (isatty(1))
       {
-        GST_INFO("Processing frame %d\n", num_frames);
+        GST_INFO("Processing frame %d, time %" GST_TIME_FORMAT "\n",
+                 num_frames, GST_TIME_ARGS(video_buf->pts));
         printf("[%5d]  \r", num_frames);
         fflush(stdout);
       }

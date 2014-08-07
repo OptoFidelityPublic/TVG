@@ -5,6 +5,9 @@
 #include <stdbool.h>
 #include <string.h>
 
+GST_DEBUG_CATEGORY_EXTERN(tvg_analyzer_debug);
+#define GST_CAT_DEFAULT tvg_analyzer_debug
+
 struct _loader_t
 {
   GstElement *pipeline;
@@ -403,6 +406,10 @@ bool loader_get_buffer(loader_t *state, GstBuffer **audio_buf,
       {
         *audio_buf = gst_buffer_ref(gst_sample_get_buffer(sample));
         gst_sample_unref(sample);
+        
+        GST_INFO("Got audio buffer: %" GST_TIME_FORMAT " duration %" GST_TIME_FORMAT,
+                 GST_TIME_ARGS((*audio_buf)->pts),
+                 GST_TIME_ARGS((*audio_buf)->duration));
       }
     }
     
@@ -414,6 +421,10 @@ bool loader_get_buffer(loader_t *state, GstBuffer **audio_buf,
       {
         *video_buf = gst_buffer_ref(gst_sample_get_buffer(sample));
         gst_sample_unref(sample);
+        
+        GST_INFO("Got video buffer: %" GST_TIME_FORMAT " duration %" GST_TIME_FORMAT,
+                 GST_TIME_ARGS((*video_buf)->pts),
+                 GST_TIME_ARGS((*video_buf)->duration));
       }
     }
   } while (*audio_buf == NULL && *video_buf == NULL && *error == NULL);
