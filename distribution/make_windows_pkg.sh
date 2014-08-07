@@ -39,6 +39,7 @@ function pick {
 # Copy GStreamer .exes and necessary .dlls
 BINFILES="
 gst-*-1.0.exe
+tvg_analyzer.exe
 "
 for f in $BINFILES $(cat distribution/dlls_to_include.txt)
     do pick bin/$f gstreamer/bin
@@ -71,6 +72,7 @@ cp distribution/gst-env.bat $PKGDIR/gstreamer/env.bat
 cp examples/*.mp4 examples/*.tvg examples/*.bmp $PKGDIR
 cp doc/tvg_manual.pdf $PKGDIR
 cp scripts/Run_TVG.bat $PKGDIR
+cp scripts/Analyzer.bat $PKGDIR
 mkdir $PKGDIR/debug
 
 # Check for missing DLLs

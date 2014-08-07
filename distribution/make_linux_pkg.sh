@@ -39,6 +39,7 @@ function pick {
 # Copy GStreamer executables
 BINFILES="
 gst-*-1.0
+tvg_analyzer
 "
 for f in $BINFILES
     do pick bin/$f gstreamer/bin
@@ -78,6 +79,7 @@ cp distribution/gst-env.sh $PKGDIR/gstreamer/env.sh
 cp examples/*.mp4 examples/*.tvg examples/*.bmp $PKGDIR
 cp doc/tvg_manual.pdf $PKGDIR
 cp scripts/Run_TVG.sh $PKGDIR
+cp scripts/Analyzer.sh $PKGDIR
 mkdir $PKGDIR/debug
 
 # Check for missing SOs
