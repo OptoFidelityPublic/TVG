@@ -51,13 +51,13 @@ SET CONTAINER=qtmux
 set AUDIOCOMPRESSION=avenc_aac compliance=-2
 
 :: Preprocessing (select one or comment all lines to disable)
-:: - videoscale ! video/x-raw-yuv,width=XXX,height=XXX                               Resize the video
-:: - videoscale ! video/x-raw-yuv,width=XXX,height=XXX,pixel-aspect-ratio=1/1        Resize the video and stretch aspect ratio
-:: - videorate ! video/x-raw-yuv,framerate=XXX/1                                     Lower FPS by dropping frames
-:: - videorate ! videoscale ! video/x-raw-yuv,framerate=XXX/1,width=XXX,height=XXX   Combination of the two
-::SET PREPROCESS=! videoscale ! video/x-raw-yuv,width=640,height=480
-::SET PREPROCESS=! videorate ! video/x-raw-yuv,framerate=10/1
-::SET PREPROCESS=! videorate ! videoscale ! video/x-raw-yuv,framerate=5/1,width=320,height=240
+:: - videoscale ! video/x-raw,width=XXX,height=XXX                               Resize the video
+:: - videoscale ! video/x-raw,width=XXX,height=XXX,pixel-aspect-ratio=1/1        Resize the video and stretch aspect ratio
+:: - videorate ! video/x-raw,framerate=XXX/1                                     Lower FPS by dropping frames
+:: - videorate ! videoscale ! video/x-raw,framerate=XXX/1,width=XXX,height=XXX   Combination of the two
+::SET PREPROCESS=! videoscale ! video/x-raw,width=640,height=480
+::SET PREPROCESS=! videorate ! video/x-raw,framerate=10/1
+::SET PREPROCESS=! videorate ! videoscale ! video/x-raw,framerate=5/1,width=320,height=240
 
 :: Number of frames to process (-1 for full length of input video)
 SET NUM_BUFFERS=256

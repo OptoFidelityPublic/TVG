@@ -44,19 +44,20 @@ CONTAINER="qtmux"
 
 # Audio compression
 # - avenc_aac    Advanced Audio Codec
+# - avenc_ac3    AC-3 Audio
 # - wavenc       Microsoft WAV
 # - vorbisenc    Vorbis audio encoder
 # - avenc_mp2    MPEG audio layer 2
 AUDIOCOMPRESSION="avenc_aac compliance=-2"
 
 # Video preprocessing (select one or comment all lines to disable)
-# - videoscale ! video/x-raw-yuv,width=XXX,height=XXX                               Resize the video
-# - videoscale ! video/x-raw-yuv,width=XXX,height=XXX,pixel-aspect-ratio=1/1        Resize the video and stretch aspect ratio
-# - videorate ! video/x-raw-yuv,framerate=XXX/1                                     Lower FPS by dropping frames
-# - videorate ! videoscale ! video/x-raw-yuv,framerate=XXX/1,width=XXX,height=XXX   Combination of the two
-# set PREPROCESS="! videoscale ! video/x-raw-yuv,width=640,height=480"
-# set PREPROCESS="! videorate ! video/x-raw-yuv,framerate=10/1"
-# set PREPROCESS="! videorate ! videoscale ! video/x-raw-yuv,framerate=5/1,width=320,height=240"
+# - videoscale ! video/x-raw,width=XXX,height=XXX                               Resize the video
+# - videoscale ! video/x-raw,width=XXX,height=XXX,pixel-aspect-ratio=1/1        Resize the video and stretch aspect ratio
+# - videorate ! video/x-raw,framerate=XXX/1                                     Lower FPS by dropping frames
+# - videorate ! videoscale ! video/x-raw,framerate=XXX/1,width=XXX,height=XXX   Combination of the two
+# set PREPROCESS="! videoscale ! video/x-raw,width=640,height=480"
+# set PREPROCESS="! videorate ! video/x-raw,framerate=10/1"
+# set PREPROCESS="! videorate ! videoscale ! video/x-raw,framerate=5/1,width=320,height=240"
 
 # Number of frames to process (-1 for full length of input video)
 NUM_BUFFERS=-1
