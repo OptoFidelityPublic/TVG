@@ -10,3 +10,4 @@ class Recipe(recipe.Recipe):
     commit = 'upstream/master'
     config_sh = "sh ./autogen.sh && ./configure"
     files_plugins = ['lib/gstreamer-1.0/libgstoftvg%(mext)s']
+    files_bins = ['tvg_analyzer']

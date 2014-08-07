@@ -1,4 +1,4 @@
-oftvg_PROGRAMS = tvg_analyzer
+bin_PROGRAMS = tvg_analyzer
 
 tvg_analyzer_SOURCES = analyzer_main.c loader.c layout.c lipsync.c markertype.c
 
