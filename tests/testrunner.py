@@ -1,6 +1,7 @@
 import json
 import subprocess
 import os.path
+import os
 
 class TestRunner:
   def __init__(self, tvg_path):
@@ -35,6 +36,9 @@ class TestRunner:
     for key, value in params.items():
       f.write('SET %s=%s\r\n' % (key, value))
     f.close()
+    
+    if os.path.isfile(params['OUTPUT']):
+      os.remove(params['OUTPUT'])
     
     print
     print "===================="

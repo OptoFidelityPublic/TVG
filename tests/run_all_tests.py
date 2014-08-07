@@ -20,5 +20,7 @@ for testcase in testcases.TestCase.__subclasses__():
 print "==============="
 if errors:
   print "Some tests failed!"
+  sys.exit(1)
 else:
   print "All tests ok"
+  sys.exit(0)
