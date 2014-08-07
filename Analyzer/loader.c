@@ -80,7 +80,7 @@ static void decodebin_pad_added(GstElement *decodebin, GstPad *pad, gpointer dat
 }
 
 /* If the video file is missing video/audio content, remove any extraneous elements */
-static void decodebin_no_more_pads(GstElement *decodebin, GstPad *pad, gpointer data)
+static void decodebin_no_more_pads(GstElement *decodebin, gpointer data)
 {
   loader_t *state = (loader_t*)data;
   
