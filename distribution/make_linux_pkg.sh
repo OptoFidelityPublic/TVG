@@ -33,7 +33,7 @@ echo
 # Usage: pick <source_file> <dest_dir>
 function pick {
     mkdir -p $PKGDIR/$2
-    cp $BUILDDIR/$1 $PKGDIR/$2
+    cp -P $BUILDDIR/$1 $PKGDIR/$2
 }
 
 # Copy GStreamer executables
@@ -83,9 +83,8 @@ cp scripts/Analyzer.sh $PKGDIR
 mkdir $PKGDIR/debug
 
 # Check for missing SOs
-MISSING="$(distribution/list_needed_sos.sh $PKGDIR/gstreamer/bin/*
-                                           $PKGDIR/gstreamer/lib/*.so*
-                                           $PKGDIR/gstreamer/lib/gstreamer-1.0/*)"
+COMMAND="distribution/list_needed_sos.sh $PKGDIR/gstreamer/bin/* $PKGDIR/gstreamer/lib/*.so* $PKGDIR/gstreamer/lib/gstreamer-1.0/*"
+MISSING="$($COMMAND)"
 
 if [ "x$MISSING" != x ]
     then echo "These SOs are possibly missing from the result package:"
