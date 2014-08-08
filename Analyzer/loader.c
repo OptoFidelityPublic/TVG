@@ -248,12 +248,12 @@ void loader_close(loader_t *state)
 
 /* Iterate the decodebin children and find an element with given klass.
  * E.g. Demuxer or Decoder/Video */
-static const gchar *get_element_name_with_klass(loader_t *state, const gchar *wanted_klass)
+static GstElement *get_element_with_klass(loader_t *state, const gchar *wanted_klass)
 {
   GstIterator *iter = gst_bin_iterate_elements(GST_BIN(state->decodebin));
   GValue item = G_VALUE_INIT;
   bool done = false;
-  const gchar *result = NULL;
+  GstElement *result = NULL;
   
   while (gst_iterator_next(iter, &item) == GST_ITERATOR_OK && !done)
   {
@@ -264,7 +264,7 @@ static const gchar *get_element_name_with_klass(loader_t *state, const gchar *wa
     
     if (strstr(klass, wanted_klass))
     {
-      result = GST_OBJECT_NAME(gst_element_get_factory(element));
+      result = g_object_ref(element);
       done = true;
     }
     
@@ -272,6 +272,74 @@ static const gchar *get_element_name_with_klass(loader_t *state, const gchar *wa
   }
   
   gst_iterator_free(iter);
+  
+  return result;
+}
+
+/* Find the decodebin element with the given klass and return the element factory's name. */
+static const gchar *get_element_name_with_klass(loader_t *state, const gchar *wanted_klass)
+{
+  GstElement *element = get_element_with_klass(state, wanted_klass);
+  const gchar *result = GST_OBJECT_NAME(gst_element_get_factory(element));
+  g_object_unref(element);
+  
+  return result;
+}
+
+static gboolean element_filter(GstPluginFeature *feature, void *data)
+{
+  return GST_IS_ELEMENT_FACTORY (feature);
+}
+
+/* Given an element in decodebin, find an encoder that can output the same format. */
+static const gchar *get_matching_encoder_name(loader_t *state, const gchar *decoder_klass,
+                                              const gchar *encoder_klass)
+{
+  const gchar *result = NULL;
+  GstElement *element = get_element_with_klass(state, decoder_klass);
+  
+  if (element != NULL)
+  {
+    GstPad *pad = gst_element_get_static_pad(element, "sink");
+    GstCaps *caps = gst_pad_get_current_caps(pad);
+    
+    if (caps == NULL)
+      caps = gst_pad_get_allowed_caps(pad);
+    
+    GST_INFO("Encoded caps for klass %s are %s", decoder_klass, gst_caps_to_string(caps));
+    
+    if (caps != NULL)
+    {
+      GList *factories;
+      GList *p;
+      
+      factories = gst_registry_feature_filter (gst_registry_get(), element_filter, false, NULL);
+      factories = g_list_sort(factories, &gst_plugin_feature_rank_compare_func);
+      factories = g_list_reverse(factories);
+        
+      for (p = factories; p != NULL; p = p->next)
+      {
+        GstElementFactory *factory = (GstElementFactory*)p->data;
+        const gchar *klass = gst_element_factory_get_metadata(factory, GST_ELEMENT_METADATA_KLASS);
+        
+        if (strstr(klass, encoder_klass))
+        {
+          GST_DEBUG("Checking %s %s", GST_OBJECT_NAME(factory), klass);
+          
+          if (gst_element_factory_can_src_any_caps(factory, caps))
+          {
+            result = GST_OBJECT_NAME(factory);
+          }
+        }
+      }
+      
+      gst_plugin_feature_list_free(factories);
+      gst_caps_unref(caps);
+    }
+    
+    g_object_unref(pad);
+    g_object_unref(element);
+  }
   
   return result;
 }
@@ -292,6 +360,24 @@ const gchar *loader_get_video_decoder(loader_t *state)
 const gchar *loader_get_audio_decoder(loader_t *state)
 {
   return get_element_name_with_klass(state, "Decoder/Audio");
+}
+
+const gchar *loader_get_mux(loader_t *state)
+{
+  return get_matching_encoder_name(state, "Demux", "Muxer");
+}
+
+const gchar *loader_get_video_encoder(loader_t *state)
+{
+  const gchar *result = get_matching_encoder_name(state, "Decoder/Video", "Encoder/Video");
+  if (!result)
+    result = get_matching_encoder_name(state, "Decoder/Image", "Encoder/Image");
+  return result;
+}
+
+const gchar *loader_get_audio_encoder(loader_t *state)
+{
+  return get_matching_encoder_name(state, "Decoder/Audio", "Encoder/Audio");
 }
 
 void loader_get_resolution(loader_t *state, int *width, int *height, int *stride)

@@ -42,11 +42,14 @@ bool first_pass(main_state_t *main_state, GError **error)
   framerate = loader_get_framerate(loader_state);
   
   printf("{\n");
-  printf("    \"file\":         \"%s\",\n", main_state->filename); 
-  printf("    \"demuxer\":      \"%s\",\n", loader_get_demux(loader_state));
-  printf("    \"video_codec\":  \"%s\",\n", loader_get_video_decoder(loader_state));
-  printf("    \"audio_codec\":  \"%s\",\n", loader_get_audio_decoder(loader_state));
-  printf("    \"resolution\":   [%d,%d],\n", width, height);
+  printf("    \"file\":           \"%s\",\n", main_state->filename); 
+  printf("    \"demuxer\":        \"%s\",\n", loader_get_demux(loader_state));
+  printf("    \"video_decoder\":  \"%s\",\n", loader_get_video_decoder(loader_state));
+  printf("    \"audio_decoder\":  \"%s\",\n", loader_get_audio_decoder(loader_state));
+  printf("    \"muxer\":          \"%s\",\n", loader_get_mux(loader_state));
+  printf("    \"video_encoder\":  \"%s\",\n", loader_get_video_encoder(loader_state));
+  printf("    \"audio_encoder\":  \"%s\",\n", loader_get_audio_encoder(loader_state));
+  printf("    \"resolution\":     [%d,%d],\n", width, height);
   
   if (framerate != 0)
     printf("    \"framerate\":    %8.2f,\n", framerate);

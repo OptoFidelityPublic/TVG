@@ -24,6 +24,15 @@ const gchar *loader_get_video_decoder(loader_t *state);
 /* Get name of the audio decompressor element */
 const gchar *loader_get_audio_decoder(loader_t *state);
 
+/* Get name of a muxer that would produce the same format. */
+const gchar *loader_get_mux(loader_t *state);
+
+/* Get name of a video encoder that would produce the same format. */
+const gchar *loader_get_video_encoder(loader_t *state);
+
+/* Get name of a audio encoder that would produce the same format. */
+const gchar *loader_get_audio_encoder(loader_t *state);
+
 /* Get resolution of video frames */
 void loader_get_resolution(loader_t *state, int *width, int *height, int *stride);
 
