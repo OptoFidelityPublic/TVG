@@ -34,7 +34,7 @@ class TestRunner:
     config = "test_config.tvg"
     f = open(config, 'w')
     for key, value in params.items():
-      f.write('SET %s=%s\r\n' % (key, value))
+      f.write('SET %s=%s\r\n' % (key, value.encode('string-escape')))
     f.close()
     
     if os.path.isfile(params['OUTPUT']):
@@ -44,13 +44,13 @@ class TestRunner:
     print "===================="
     print "Generating test video"
     print "Running command: " + self.run_tvg + " " + config
-    subprocess.check_call([self.run_tvg, config])
+    subprocess.check_call([self.run_tvg, config, 'nopause'])
     
     print
     print "===================="
     print "Analyzing result file"
     print "Running command: " + self.analyzer + " " + params['OUTPUT'] + " > analyzer_output.txt"
-    data = subprocess.check_output([self.analyzer, params['OUTPUT']])
+    data = subprocess.check_output([self.analyzer, params['OUTPUT'], 'nopause'])
     open('analyzer_output.txt', 'w').write(data)
     
     return json.loads(data)

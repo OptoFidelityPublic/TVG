@@ -58,3 +58,14 @@ Note that the distribution version you use to build will determine the minimum
 system requirements for the built package. For example, it will not run with
 an older version of glibc.
 
+--
+
+Running the tests:
+
+1. Go to the 'tests' folder.
+
+2. Execute run_all_tests.py with the path to the extracted binary package:
+python2 run_all_tests.py ../tvg-1.0beta4-linux-x64/
+
+3. The last line will read "All tests ok" if the tests were successful.
+

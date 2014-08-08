@@ -101,5 +101,7 @@ gst-launch-1.0 -q ^
         decode. ! audioconvert ! audioresample ! queue ! oftvg. ^
         oftvg. ! queue ! audioconvert ! %AUDIOCOMPRESSION% ! queue ! mux.
         
+if not [%2]==[nopause] (
 @echo Done! Press enter to exit.
 PAUSE
+)

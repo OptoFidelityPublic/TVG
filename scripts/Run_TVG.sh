@@ -75,7 +75,7 @@ CALIBRATION="off"
 # You can put just the settings you want to change in a file named something.tvg
 # and open it with Run_TVG.sh as the program.
 if [ -e "$1" ]
-then eval $(cat $1 | sed 's/^::/#/' | sed 's/SET \([^=]*\)=\(.*\)/\1="\2"/')
+then eval $(cat $1 | sed 's/^::/#/' | sed 's/SET \([^=]*\)=\(.*\)/\1="\2"/I')
      echo Loaded parameters from $1
 fi
 
