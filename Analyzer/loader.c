@@ -280,6 +280,10 @@ static GstElement *get_element_with_klass(loader_t *state, const gchar *wanted_k
 static const gchar *get_element_name_with_klass(loader_t *state, const gchar *wanted_klass)
 {
   GstElement *element = get_element_with_klass(state, wanted_klass);
+  
+  if (!element)
+    return NULL;
+  
   const gchar *result = GST_OBJECT_NAME(gst_element_get_factory(element));
   g_object_unref(element);
   
