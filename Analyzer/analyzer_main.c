@@ -135,7 +135,7 @@ bool first_pass(main_state_t *main_state, GError **error)
   printf("    \"video_length\": %8.3f,\n", (float)video_end_time / GST_SECOND);
   printf("    \"audio_length\": %8.3f,\n", (float)audio_end_time / GST_SECOND);
   
-  if (video_start_time > GST_MSECOND)
+  if (video_start_time > GST_MSECOND && GST_CLOCK_TIME_IS_VALID(video_start_time))
   {
     gchar* m = g_strdup_printf(
       "Video time does not start from 0 (offset = %0.3f s)",
@@ -143,7 +143,7 @@ bool first_pass(main_state_t *main_state, GError **error)
     g_array_append_val(main_state->warnings, m);          
   }
   
-  if (audio_start_time > GST_MSECOND)
+  if (audio_start_time > GST_MSECOND && GST_CLOCK_TIME_IS_VALID(audio_start_time))
   {
     gchar* m = g_strdup_printf(
       "Audio time does not start from 0 (offset = %0.3f s)",
