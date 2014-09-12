@@ -17,17 +17,19 @@ SET OUTPUT=output.mov
 
 :: Video compression (select one)
 :: You can get configuration parameters for each format in the manual or
-:: by running e.g. gst-inspect x264enc
-:: - video/x-raw-yuv     Uncompressed video (YUV)
-:: - video/x-raw-rgb     Uncompressed video (RGB)
-:: - x264enc             H.264 video
-:: - avenc_libx265       H.265 video
-:: - jpegenc             Motion-JPEG video
-:: - avenc_mpeg4         MPEG-4 part 2
-:: - avenc_mpeg2video    MPEG-2 video
-:: - avenc_wmv2          Windows Media Video 8
-:: - avenc_flv           Flash video 
-:: - vp9enc              Google VP9 video
+:: by running e.g. gst-inspect-1.0 x264enc
+:: - video/x-raw, format=I420     Uncompressed video (YUV I420)
+:: - video/x-raw, format=YUY2     Uncompressed video (YUV YUY2/422)
+:: - video/x-raw, format=BGR      Uncompressed video (RGB 24bit)
+:: - video/x-raw, format=BGRx     Uncompressed video (RGB 32bit)
+:: - x264enc                      H.264 video
+:: - avenc_libx265                H.265 video
+:: - jpegenc                      Motion-JPEG video
+:: - avenc_mpeg4                  MPEG-4 part 2
+:: - avenc_mpeg2video             MPEG-2 video
+:: - avenc_wmv2                   Windows Media Video 8
+:: - avenc_flv                    Flash video 
+:: - vp9enc                       Google VP9 video
 SET COMPRESSION=x264enc speed-preset=4
 
 :: Video container format (select one)
