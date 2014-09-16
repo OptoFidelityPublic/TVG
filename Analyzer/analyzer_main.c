@@ -56,6 +56,8 @@ bool first_pass(main_state_t *main_state, GError **error)
   else
     printf("    \"framerate\":    \"variable\",\n");
   
+  printf("    \"audio_rate\":   %8d,\n", main_state->samplerate);
+  
   layout_state = layout_create(width, height);
   
   int num_frames = 0;

@@ -41,10 +41,8 @@ GST_DEBUG_CATEGORY_EXTERN(gst_oftvg_debug);
 
 /* Template for the source pin.
  * We only support a single format, audioconvert shall convert the data
- * to any other format that is needed.
+ * from any other format that is needed.
  */
-#define SAMPLERATE 44100
-#define SAMPLERATE_STR "44100"
 static GstStaticPadTemplate sink_template =
 GST_STATIC_PAD_TEMPLATE (
   "sink",
@@ -53,7 +51,7 @@ GST_STATIC_PAD_TEMPLATE (
   GST_STATIC_CAPS (
     "audio/x-raw, "
     "format = (string) \"" GST_AUDIO_NE(S16) "\", "
-    "rate = (int) " SAMPLERATE_STR ", "
+    "rate = (int) [ 1, max ], "
     "layout = (string) interleaved, "
     "channels = (int) 2;"
   )
@@ -66,7 +64,7 @@ GST_STATIC_PAD_TEMPLATE (
   GST_STATIC_CAPS (
     "audio/x-raw, "
     "format = (string) \"" GST_AUDIO_NE(S16) "\", "
-    "rate = (int) " SAMPLERATE_STR ", "
+    "rate = (int) [ 1, max ], "
     "layout = (string) interleaved, "
     "channels = (int) 2;"
   )
@@ -164,7 +162,7 @@ void gst_oftvg_audio_end_stream(GstOFTVG_Audio* element)
  * end:   index of last sample to modify
  * phase: keeps track of the sine wave phase between buffers
  */
-static void add_beep(GstBuffer *buffer, int start, int end, int *phase, int num_channels)
+static void add_beep(GstBuffer *buffer, int start, int end, int *phase, int num_channels, int samplerate)
 {
   /* Map the buffer data to memory */
   GstMapInfo mapinfo;
@@ -181,8 +179,8 @@ static void add_beep(GstBuffer *buffer, int start, int end, int *phase, int num_
     float s = 0;
     int p = *phase;
     *phase += 1;
-    s += sin(2 * M_PI * 547 * p / SAMPLERATE);
-    s += sin(2 * M_PI * 1823 * p / SAMPLERATE);
+    s += sin(2 * M_PI * 547 * p / samplerate);
+    s += sin(2 * M_PI * 1823 * p / samplerate);
     
     /* Add to existing data at about 75% volume */
     for (int j = 0; j < num_channels; j++)
@@ -204,7 +202,17 @@ GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf
   GstOFTVG_Audio *filter = GST_OFTVG_AUDIO(src);
   int offset = 0;
   int num_channels = 2;
+  int samplerate = 0;
   int buflen = gst_buffer_get_size(buf) / sizeof(gint16) / num_channels;
+  
+  {
+    GstCaps *caps = gst_pad_get_current_caps(GST_BASE_TRANSFORM_SINK_PAD(src));
+    GstAudioInfo info;
+    gst_audio_info_init(&info);
+    gst_audio_info_from_caps(&info, caps); 
+    samplerate = GST_AUDIO_INFO_RATE(&info);
+    gst_caps_unref(caps);
+  }
   
   GST_DEBUG("Incoming buffer: %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT " (%d samples)",
             GST_TIME_ARGS(GST_BUFFER_PTS(buf)),
@@ -223,10 +231,10 @@ GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf
   while (offset < buflen && !filter->end_of_stream)
   {
     /* Calculate timestamp at this offset */
-    GstClockTime start_time = GST_BUFFER_PTS(buf) + GST_SECOND * offset / SAMPLERATE;
+    GstClockTime start_time = GST_BUFFER_PTS(buf) + GST_SECOND * offset / samplerate;
     
     /* Fetch a new beep entry if needed */
-    int min_len = GST_SECOND / SAMPLERATE;
+    int min_len = GST_SECOND / samplerate;
     if (filter->current == NULL || filter->current->end <= start_time + min_len)
     {
       if (filter->current != NULL)
@@ -262,11 +270,11 @@ GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf
     
     /* Figure out at which offset the beep starts */
     GstClockTimeDiff delta = (filter->current->start - start_time);
-    int start_offset = offset + delta * SAMPLERATE / GST_SECOND;
+    int start_offset = offset + delta * samplerate / GST_SECOND;
     
     /* Figure out how many samples long the beep is */
     GstClockTimeDiff length = (filter->current->end - filter->current->start);
-    int num_samples = length * SAMPLERATE / GST_SECOND;
+    int num_samples = length * samplerate / GST_SECOND;
     
     /* Check if the beep overlaps this buffer */
     if (start_offset < buflen)
@@ -289,7 +297,7 @@ GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf
       {
         GST_DEBUG("Processing beep at offset %d, length %d, phase %d",
                   start_offset, num_samples, filter->phase);
-        add_beep(buf, start_offset, start_offset + num_samples, &filter->phase, num_channels);
+        add_beep(buf, start_offset, start_offset + num_samples, &filter->phase, num_channels, samplerate);
       }
     }
     
