@@ -345,18 +345,27 @@ static void save_details(main_state_t *main_state)
   if (!f)
     return;
   
-  for (frame_index = 0; frame_index < main_state->frame_data->len; frame_index++)
+  for (frame_index = 0; frame_index <= main_state->frame_data->len; frame_index++)
   {
-    GstClockTime frame_time = g_array_index(main_state->frame_times, GstClockTime, frame_index);
-    char * frame_data = g_array_index(main_state->frame_data, char*, frame_index);
+    GstClockTime frame_time = 0;
+    char *frame_data = NULL;
     
-    if (lipsync_index < main_state->lipsync_markers->len)
+    /* On the last iteration, process all the beeps that come after the last video frame */
+    bool last = (frame_index == main_state->frame_data->len);
+    
+    if (!last)
+    {
+      frame_time = g_array_index(main_state->frame_times, GstClockTime, frame_index);
+      frame_data = g_array_index(main_state->frame_data, char*, frame_index);
+    }
+    
+    while (lipsync_index < main_state->lipsync_markers->len)
     {
       lipsync_marker_t beep = g_array_index(main_state->lipsync_markers, lipsync_marker_t, lipsync_index);
       GstClockTime beep_start = beep.start_sample * GST_SECOND / main_state->samplerate;
       GstClockTime beep_end = beep.end_sample * GST_SECOND / main_state->samplerate;
       
-      if (beep_start <= frame_time)
+      if (last || beep_start <= frame_time)
       {
         fprintf(f, "AUDIO: %8d %5d\n",
                 (int)(beep_start / GST_USECOND),
@@ -364,10 +373,16 @@ static void save_details(main_state_t *main_state)
               );
         lipsync_index++;
       }
+      else
+      {
+        break;
+      }
     }
     
-    
-    fprintf(f, "VIDEO: %8d %s\n", (int)(frame_time / GST_USECOND), frame_data);    
+    if (!last)
+    {
+      fprintf(f, "VIDEO: %8d %s\n", (int)(frame_time / GST_USECOND), frame_data);
+    }
   }
   
   fclose(f);

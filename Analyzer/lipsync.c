@@ -99,6 +99,9 @@ void lipsync_process(lipsync_t *lipsync, const int16_t *data, size_t num_samples
         lipsync->current_marker.end_sample -= TVG_LIPSYNC_BUFFER_LENGTH
                                               * (max_value - end_threshold) / max_value;
         
+        if (lipsync->current_marker.start_sample < 0)
+          lipsync->current_marker.start_sample = 0;
+
         g_array_append_val(lipsync->detected_markers, lipsync->current_marker);
       }
     }
