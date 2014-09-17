@@ -23,7 +23,7 @@ public:
   
   // Load the layout bitmap
   // init_caps() must be called before this function.
-  bool init_layout(const gchar* layout_file);
+  bool init_layout(const gchar* layout_file, bool calibration_rgb6_white);
   
   // Process a fully white calibration frame
   void process_calibration_white(GstBuffer *buf);

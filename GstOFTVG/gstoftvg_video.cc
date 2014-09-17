@@ -306,7 +306,9 @@ static gboolean gst_oftvg_video_set_caps(GstBaseTransform* object, GstCaps* inca
     return false;
   }
   
-  if (!filter->process->init_layout(filter->location))
+  bool rgb6_white = (g_strcmp0(filter->calibration, "rgb6_prepend") == 0 ||
+                     g_strcmp0(filter->calibration, "rgb_both") == 0);
+  if (!filter->process->init_layout(filter->location, rgb6_white))
   {
     GST_ELEMENT_ERROR(filter, RESOURCE, NOT_FOUND,
                       ("Failed to load layout %s", filter->location), (NULL));
@@ -463,7 +465,8 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
       /* Otherwise try to stop earlier to leave enough time for postcalibration */
       if (buffer_end_time + 6 * GST_SECOND >= filter->end_of_video)
       {
-        if (g_strcmp0(filter->calibration, "both") == 0)
+        if (g_strcmp0(filter->calibration, "both") == 0 ||
+            g_strcmp0(filter->calibration, "rgb6_both") == 0)
         {
           GST_DEBUG("Close to end of video, going into postcalibration");
           filter->state = STATE_POSTCALIBRATION;

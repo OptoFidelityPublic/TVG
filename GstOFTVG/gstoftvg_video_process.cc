@@ -94,7 +94,7 @@ bool OFTVG_Video_Process::init_custom_sequence(const gchar* sequence_file)
 }
 
 // Load the layout bitmap
-bool OFTVG_Video_Process::init_layout(const gchar* layout_file)
+bool OFTVG_Video_Process::init_layout(const gchar* layout_file, bool calibration_rgb6_white)
 {
   GError* error = NULL;
   gboolean ret = TRUE;
@@ -120,6 +120,15 @@ bool OFTVG_Video_Process::init_layout(const gchar* layout_file)
     layout_calibration_marks.clear();
     ret = gst_oftvg_load_layout_bitmap(layout_file, &error, &layout_calibration_marks, width, height,
                                        OFTVG::OVERLAY_MODE_CALIBRATION, custom_sequence);
+  }
+  
+  // Layout option where only the RGB6 markers are white during prefix/suffix
+  if (ret && calibration_rgb6_white)
+  {
+    layout_calibration_white.clear();
+    ret = gst_oftvg_load_layout_bitmap(layout_file, &error, &layout_calibration_white, width, height,
+                                       OFTVG::OVERLAY_MODE_RGB6_WHITE, custom_sequence);
+    layout_calibration_marks = layout_calibration_white;
   }
   
   if (!ret)

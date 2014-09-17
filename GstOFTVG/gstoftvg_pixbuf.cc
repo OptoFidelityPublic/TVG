@@ -86,6 +86,11 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
         {
           // Sync marks are not visible in the calibration image.
         }
+        else if (overlay_mode == OFTVG::OVERLAY_MODE_RGB6_WHITE)
+        {
+          GstOFTVGElement_Constant element(x, y, 1, 1, OFTVG::MARKCOLOR_WHITE);
+          layout->addElement(element);
+        }
         else
         {
           GstOFTVGElement_SyncMark element(x, y, 1, 1, i + 1, customseq);

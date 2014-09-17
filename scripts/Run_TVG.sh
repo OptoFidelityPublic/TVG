@@ -50,6 +50,7 @@ CONTAINER="qtmux"
 # - wavenc       Microsoft WAV
 # - vorbisenc    Vorbis audio encoder
 # - avenc_mp2    MPEG audio layer 2
+# - identity     No audio compression (raw PCM)
 AUDIOCOMPRESSION="avenc_aac compliance=-2"
 
 # Video preprocessing (select one or comment all lines to disable)
