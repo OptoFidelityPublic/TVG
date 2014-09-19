@@ -101,7 +101,7 @@ gst-launch-1.0 -q \
         ! oftvg location="$LAYOUT" num-buffers=$NUM_BUFFERS calibration=$CALIBRATION \
                 name=oftvg lipsync=$LIPSYNC \
         ! queue ! videoconvert ! $COMPRESSION ! $QUEUE ! $CONTAINER name=mux ! filesink location="$OUTPUT" \
-        decode. ! audioconvert ! $QUEUE ! oftvg. \
+        decode. ! audioconvert ! volume volume=0.5 ! $QUEUE ! oftvg. \
         oftvg. ! queue ! audioconvert ! $AUDIOCOMPRESSION ! $QUEUE ! mux.
 
 echo Done!
