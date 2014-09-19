@@ -93,14 +93,15 @@ rm -f $DEBUGDIR/*.dot $DEBUGDIR/*.txt $DEBUGDIR/*.png
 export GST_DEBUG_DUMP_DOT_DIR=$DEBUGDIR
 export GST_DEBUG_FILE=$DEBUGDIR/log.txt
 export GST_DEBUG=*:4
+QUEUE="queue max-size-bytes=100000000 max-size-time=10000000000"
 
 # Actual command that executes gst-launch
 gst-launch-1.0 -q \
-        filesrc location="$INPUT" ! decodebin name=decode $PREPROCESS ! queue \
+        filesrc location="$INPUT" ! decodebin name=decode $PREPROCESS ! $QUEUE \
         ! oftvg location="$LAYOUT" num-buffers=$NUM_BUFFERS calibration=$CALIBRATION \
                 name=oftvg lipsync=$LIPSYNC \
-        ! queue ! videoconvert ! $COMPRESSION ! queue ! $CONTAINER name=mux ! filesink location="$OUTPUT" \
-        decode. ! audioconvert ! queue ! oftvg. \
-        oftvg. ! queue ! audioconvert ! $AUDIOCOMPRESSION ! queue ! mux.
+        ! queue ! videoconvert ! $COMPRESSION ! $QUEUE ! $CONTAINER name=mux ! filesink location="$OUTPUT" \
+        decode. ! audioconvert ! $QUEUE ! oftvg. \
+        oftvg. ! queue ! audioconvert ! $AUDIOCOMPRESSION ! $QUEUE ! mux.
 
 echo Done!
