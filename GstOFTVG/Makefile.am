@@ -10,6 +10,9 @@ libgstoftvg_la_SOURCES += gstoftvg_video_process.cc gstoftvg_layout.cc gstoftvg_
 # Audio source
 libgstoftvg_la_SOURCES += gstoftvg_audio.cc
 
+# Decodebin wrapper
+libgstoftvg_la_SOURCES += autoaudio_decodebin.cc
+
 WFLAGS = -Wall -Wextra -Wno-unused-parameter -O0 -ggdb
 libgstoftvg_la_CFLAGS = $(GST_CFLAGS) $(GDK_CFLAGS) $(WFLAGS)
 libgstoftvg_la_CXXFLAGS = $(GST_CFLAGS) $(GDK_CFLAGS) $(WFLAGS)

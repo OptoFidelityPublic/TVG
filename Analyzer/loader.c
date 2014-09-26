@@ -46,12 +46,12 @@ static void decodebin_pad_added(GstElement *decodebin, GstPad *pad, gpointer dat
     {
       if (gst_pad_link(pad, audiopad) != GST_PAD_LINK_OK)
       {
-        GST_ELEMENT_ERROR(state->audioconvert, STREAM, WRONG_TYPE, NULL,
+        GST_ELEMENT_ERROR(state->audioconvert, STREAM, WRONG_TYPE, (NULL),
                           ("Could not link decodebin to audioconvert"));
       }
       else if (!gst_element_link(state->audioconvert, state->audiosink))
       {
-        GST_ELEMENT_ERROR(state->audiosink, STREAM, WRONG_TYPE, NULL,
+        GST_ELEMENT_ERROR(state->audiosink, STREAM, WRONG_TYPE, (NULL),
                           ("Could not link audioconvert to audiosink"));
       }
     }
@@ -66,12 +66,12 @@ static void decodebin_pad_added(GstElement *decodebin, GstPad *pad, gpointer dat
     {
       if (gst_pad_link(pad, videopad) != GST_PAD_LINK_OK)
       {
-        GST_ELEMENT_ERROR(state->videoconvert, STREAM, WRONG_TYPE, NULL,
+        GST_ELEMENT_ERROR(state->videoconvert, STREAM, WRONG_TYPE, (NULL),
                           ("Could not link decodebin to videoconvert"));
       }
       else if (!gst_element_link(state->videoconvert, state->videosink))
       {
-        GST_ELEMENT_ERROR(state->videoconvert, STREAM, WRONG_TYPE, NULL,
+        GST_ELEMENT_ERROR(state->videoconvert, STREAM, WRONG_TYPE, (NULL),
                           ("Could not link videoconvert to videosink"));
       }
     }

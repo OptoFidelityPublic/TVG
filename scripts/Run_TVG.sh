@@ -97,7 +97,7 @@ QUEUE="queue max-size-bytes=100000000 max-size-time=10000000000"
 
 # Actual command that executes gst-launch
 gst-launch-1.0 -q \
-        filesrc location="$INPUT" ! decodebin name=decode $PREPROCESS ! $QUEUE \
+        filesrc location="$INPUT" ! autoaudio_decodebin name=decode $PREPROCESS ! $QUEUE \
         ! oftvg location="$LAYOUT" num-buffers=$NUM_BUFFERS calibration=$CALIBRATION \
                 name=oftvg lipsync=$LIPSYNC \
         ! queue ! videoconvert ! $COMPRESSION ! $QUEUE ! $CONTAINER name=mux ! filesink location="$OUTPUT" \
