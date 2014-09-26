@@ -67,6 +67,11 @@ static void gst_oftvg_addElementFromRGB(GstOFTVGLayout* layout,
         GstOFTVGElement_Constant element(x, y, 1, 1, OFTVG::MARKCOLOR_BLACK);
         layout->addElement(element);
       }
+      else if (overlay_mode == OFTVG::OVERLAY_MODE_RGB6_WHITE)
+      {
+        GstOFTVGElement_Constant element(x, y, 1, 1, OFTVG::MARKCOLOR_WHITE);
+        layout->addElement(element);
+      }
       else
       {
         GstOFTVGElement_FrameID element(x, y, 1, 1, frameid_n);
