@@ -306,8 +306,7 @@ static gboolean gst_oftvg_video_set_caps(GstBaseTransform* object, GstCaps* inca
     return false;
   }
   
-  bool rgb6_white = (g_strcmp0(filter->calibration, "rgb6_prepend") == 0 ||
-                     g_strcmp0(filter->calibration, "rgb_both") == 0);
+  bool rgb6_white = (g_str_has_prefix(filter->calibration, "rgb6"));
   if (!filter->process->init_layout(filter->location, rgb6_white))
   {
     GST_ELEMENT_ERROR(filter, RESOURCE, NOT_FOUND,
@@ -340,7 +339,7 @@ static gboolean gst_oftvg_video_sink_event(GstBaseTransform *object, GstEvent *e
   else if (GST_EVENT_TYPE(event) == GST_EVENT_EOS)
   {
     /* If post-calibration was requested, make sure that it was done. */
-    if (filter->state != STATE_END && g_strcmp0(filter->calibration, "both") == 0)
+    if (filter->state != STATE_END && g_str_has_suffix(filter->calibration, "both"))
     {
       GST_ELEMENT_WARNING(filter, STREAM, FAILED,
                           ("Stream ended unexpectedly, is num_buffers too large?"
@@ -448,7 +447,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
       /* Easy case: a fixed number of buffers */
       if (filter->frame_counter >= filter->num_buffers)
       {
-        if (g_strcmp0(filter->calibration, "both") == 0)
+        if (g_str_has_suffix(filter->calibration, "both"))
         {
           GST_DEBUG("Given number of frames processed, going into postcalibration");
           filter->state = STATE_POSTCALIBRATION;
@@ -465,8 +464,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
       /* Otherwise try to stop earlier to leave enough time for postcalibration */
       if (buffer_end_time + 6 * GST_SECOND >= filter->end_of_video)
       {
-        if (g_strcmp0(filter->calibration, "both") == 0 ||
-            g_strcmp0(filter->calibration, "rgb6_both") == 0)
+        if (g_str_has_suffix(filter->calibration, "both"))
         {
           GST_DEBUG("Close to end of video, going into postcalibration");
           filter->state = STATE_POSTCALIBRATION;
