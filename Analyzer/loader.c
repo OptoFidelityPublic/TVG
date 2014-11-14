@@ -206,7 +206,11 @@ loader_t *loader_open(const gchar *filename, GError **error)
   
   /* Try to start the pipeline and check for errors */
   gst_element_set_state(state->pipeline, GST_STATE_PLAYING);
-  while(1)
+  
+  bool state_changed = false;
+  while (!state_changed ||
+         (state->audiosink != NULL && g_atomic_int_get(&state->available_audio_buffers) == 0) ||
+         (state->videosink != NULL && g_atomic_int_get(&state->available_video_buffers) == 0))
   {
     GstMessage *msg = gst_bus_timed_pop(state->bus, GST_SECOND);
     if (msg != NULL)
@@ -221,7 +225,7 @@ loader_t *loader_open(const gchar *filename, GError **error)
         gst_message_parse_state_changed(msg, NULL, &newstate, NULL);
         if (newstate == GST_STATE_PLAYING)
         {
-          break;
+          state_changed = true;
         }
       }
       gst_message_unref(msg);
