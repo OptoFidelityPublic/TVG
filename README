@@ -60,6 +60,35 @@ an older version of glibc.
 
 --
 
+Debugging
+
+The files in the distribution package have been stripped of debug symbols
+in order to reduce the size of the package. The original versions are
+stored in a separate package:
+
+1. Obtain the tvg-1.xxxxxx-xxxxx-debug.zip from the build machine.
+
+2. Extract the binaries and libraries over the stripped versions.
+   E.g. tvg...debug/libgstoftvg.dll overwrites tvg/gstreamer/lib/libgstoftvg.dll
+
+3. Obtain gdb for your platform. E.g. mingw64 x86_64 gdb for Windows.
+
+4. Getting the command line arguments from within Run_TVG.bat requires
+   a small trick. Replace this multi-line block:
+      gst-launch-1.0 -q ^ ......... ^ ...... ^ ....
+   with:
+      echo set args -q ^ ....... ^ ...... ^ .... > args.txt
+   and add after it:
+      C:\mingw64\bin\gdb -x args.txt gst-launch-1.0
+
+   Run the Run_TVG.bat and when you get into gdb, type "run" and it will
+   apply the arguments automatically.
+
+6. If GDB does not find the source code, use "directory" command to give path:
+      directory ..\..\TVG\GstOFTVG
+
+--
+
 Running the tests:
 
 1. Go to the 'tests' folder.
