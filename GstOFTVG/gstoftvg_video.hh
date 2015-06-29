@@ -72,6 +72,9 @@ struct _GstOFTVG_Video
 {
   GstBaseTransform element;
   
+  /* Has init_caps() been called? */
+  bool have_caps;
+  
   /* Current state of filter */
   enum state_t state;
   

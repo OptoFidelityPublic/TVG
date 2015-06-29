@@ -257,6 +257,7 @@ GSTOFTVG_VIDEO_PROPERTIES
 static gboolean gst_oftvg_video_start(GstBaseTransform* object)
 {
   GstOFTVG_Video *filter = GST_OFTVG_VIDEO(object);
+  filter->have_caps = 0;
   filter->frame_counter = 0;
   filter->first = true;
   filter->last_state_change = 0;
@@ -292,6 +293,8 @@ static gboolean gst_oftvg_video_set_caps(GstBaseTransform* object, GstCaps* inca
 {
   GstOFTVG_Video *filter = GST_OFTVG_VIDEO(object);
   (void)outcaps; /* unused */
+  
+  filter->have_caps = true;
   
   if (!filter->process->init_caps(incaps))
   {
@@ -359,6 +362,14 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   GstOFTVG_Video *filter = GST_OFTVG_VIDEO(object);
   GstClockTime buffer_end_time = GST_BUFFER_PTS(buf) + GST_BUFFER_DURATION(buf);
   state_t prev_state = filter->state;
+  
+  if (!filter->have_caps)
+  {
+    GST_DEBUG("Initializing caps\n");
+    GstCaps *caps = gst_pad_get_current_caps(GST_BASE_TRANSFORM_SINK_PAD(object));
+    gst_oftvg_video_set_caps(object, caps, caps);
+    gst_caps_unref(caps);
+  }
   
   GST_DEBUG("Video buffer: %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT "\n",
               GST_TIME_ARGS(GST_BUFFER_PTS(buf)),
