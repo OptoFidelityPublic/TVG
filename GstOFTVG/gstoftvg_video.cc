@@ -409,7 +409,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   {
     filter->process->process_calibration_white(buf);
     
-    if (buffer_end_time >= filter->pre_white_time * GST_MSECOND)
+    if (buffer_end_time >= filter->pre_white_duration * GST_MSECOND)
     {
       filter->state = STATE_PRECALIBRATION_MARKS;
     }
@@ -418,7 +418,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   {
     filter->process->process_calibration_marks(buf);
     
-    if (buffer_end_time >= (filter->pre_white_time + filter->pre_marks_time) * GST_MSECOND)
+    if (buffer_end_time >= (filter->pre_white_duration + filter->pre_marks_duration) * GST_MSECOND)
     {
       if (g_strcmp0(filter->calibration, "only") == 0)
       {
@@ -473,7 +473,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
     else
     {
       /* Otherwise try to stop earlier to leave enough time for postcalibration */
-      if (buffer_end_time + (filter->post_white_time + 1000) * GST_MSECOND >= filter->end_of_video)
+      if (buffer_end_time + (filter->post_white_duration + 1000) * GST_MSECOND >= filter->end_of_video)
       {
         if (g_str_has_suffix(filter->calibration, "both"))
         {
@@ -487,7 +487,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   {
     filter->process->process_calibration_white(buf);
     
-    if (buffer_end_time - filter->last_state_change >= filter->post_white_time * GST_MSECOND)
+    if (buffer_end_time - filter->last_state_change >= filter->post_white_duration * GST_MSECOND)
     {
       filter->state = STATE_END;
     }
