@@ -74,6 +74,18 @@ SET LIPSYNC=-1
 :: - both     Both at start and end (for Video Multimeter)
 SET CALIBRATION=both
 
+:: Duration of pre calibration white screen in milliseconds
+:: If CALIBRATION == "off", this has no effect.
+SET PRE_WHITE_DURATION=4000
+
+:: After the white screen above is shown for the given time, calibration marks can be 
+:: drawn on top of the white screen. This parameter defines their duration in milliseconds.
+SET PRE_MARKS_DURATION=1000
+
+:: Duration of post calibration white screen in milliseconds
+:: If CALIBRATION == "off", this has no effect.
+SET POST_WHITE_DURATION=5000
+
 :: You can put just the settings you want to change in a file named something.tvg
 :: and open it with Run_TVG.bat as the program.
 if exist "%1" (
@@ -99,7 +111,8 @@ set QUEUE=queue max-size-bytes=100000000 max-size-time=10000000000
 gst-launch-1.0 -q ^
 	filesrc location="%INPUT%" ! autoaudio_decodebin name=decode %PREPROCESS% ! %QUEUE% ^
         ! oftvg location="%LAYOUT%" num-buffers=%NUM_BUFFERS% calibration=%CALIBRATION% ^
-                name=oftvg lipsync=%LIPSYNC% ^
+        pre_white_duration=%PRE_WHITE_DURATION% pre_marks_duration=%PRE_MARKS_DURATION% ^
+		post_white_duration=%POST_WHITE_DURATION% name=oftvg lipsync=%LIPSYNC% ^
         ! queue ! videoconvert ! %COMPRESSION% ! %QUEUE% ! %CONTAINER% name=mux ! filesink location="%OUTPUT%" ^
         decode. ! audioconvert ! volume volume=0.5 ! %QUEUE% ! oftvg. ^
         oftvg. ! queue ! audioconvert ! %AUDIOCOMPRESSION% ! %QUEUE% ! mux.
