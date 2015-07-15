@@ -68,18 +68,20 @@ SET NUM_BUFFERS=256
 SET LIPSYNC=-1
 
 :: Whether to create a calibration video
-:: - off      No calibration sequence
-:: - only     Only the calibration sequence, ie. create a separate calibration video
-:: - prepend  Put the calibration sequence before the actual video
-:: - both     Both at start and end (for Video Multimeter)
+:: - off             No calibration sequence
+:: - only     	     Only the calibration sequence, ie. create a separate calibration video
+:: - prepend  	     Put the calibration sequence before the actual video
+:: - both     	     Both at start and end (for Video Multimeter)
+:: - rgb6_prepend    Like "prepend", but white color is only placed in the marker area
+:: - rgb6_both	     Like "both", but white color is only placed in the marker area
 SET CALIBRATION=both
 
 :: Duration of pre calibration white screen in milliseconds
 :: If CALIBRATION == "off", this has no effect.
 SET PRE_WHITE_DURATION=4000
 
-:: After the white screen above is shown for the given time, calibration marks can be 
-:: drawn on top of the white screen. This parameter defines their duration in milliseconds.
+:: Duration of pre calibration markers in milliseconds
+:: If CALIBRATION == "off", this has no effect.
 SET PRE_MARKS_DURATION=1000
 
 :: Duration of post calibration white screen in milliseconds

@@ -261,7 +261,7 @@ static gboolean gst_oftvg_video_start(GstBaseTransform* object)
   filter->frame_counter = 0;
   filter->first = true;
   filter->last_state_change = 0;
-  filter->end_of_video = G_MAXINT64;
+  filter->end_of_video = G_MAXUINT64;
   filter->progress_timestamp = 0;
   filter->lipsync_timestamp = 0;
   filter->process = new OFTVG_Video_Process();
@@ -335,7 +335,7 @@ static gboolean gst_oftvg_video_sink_event(GstBaseTransform *object, GstEvent *e
     {
       if (segment->stop > 0)
       {
-        filter->end_of_video = segment->stop;
+	filter->end_of_video = segment->duration;
       }
     }
   }
@@ -422,8 +422,8 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
     {
       if (g_strcmp0(filter->calibration, "only") == 0)
       {
-        GST_DEBUG("Calibration=only is done");
-        filter->state = STATE_END;
+        GST_DEBUG("Precalibration=only is done");
+        filter->state = STATE_POSTCALIBRATION;
       }
       else
       {
