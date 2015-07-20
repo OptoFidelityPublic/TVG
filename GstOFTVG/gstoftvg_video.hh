@@ -34,10 +34,11 @@
  * - default value for the variable
  */
 #define GSTOFTVG_VIDEO_PROPERTIES \
-  PROP_STR(CALIBRATION, calibration, "(off|prepend|only|both) Generate white start/ending sequence", "off") \
-  PROP_INT(PRE_WHITE_DURATION, pre_white_duration, "Duration of precalibration white screen in milliseconds.", 4000) \
-  PROP_INT(PRE_MARKS_DURATION, pre_marks_duration, "Duration of precalibration marks in milliseconds.", 1000) \
+  PROP_INT(PRE_WHITE_DURATION,  pre_white_duration,  "Duration of precalibration white screen in milliseconds.", 4000) \
+  PROP_INT(PRE_MARKS_DURATION,  pre_marks_duration,  "Duration of precalibration marks in milliseconds.", 1000) \
   PROP_INT(POST_WHITE_DURATION, post_white_duration, "Duration of postcalibration white screen in milliseconds.", 5000) \
+  PROP_BOOL(RGB6_CALIBRATION,   rgb6_calibration,    "If true, calibration white color is only placed in marker area.", false) \
+  PROP_BOOL(ONLY_CALIBRATION,   only_calibration,    "If true, only the calibration sequence video is made.", false) \
   PROP_STR(LOCATION,    location,    "Layout bitmap file location" , "layout.bmp") \
   PROP_STR(SEQUENCE,    sequence,    "Optional text file with custom color sequence data", "") \
   PROP_INT(NUM_BUFFERS, num_buffers, "Number of frames to include, -1 for all.", -1) \

@@ -265,14 +265,26 @@ static gboolean gst_oftvg_video_start(GstBaseTransform* object)
   filter->progress_timestamp = 0;
   filter->lipsync_timestamp = 0;
   filter->process = new OFTVG_Video_Process();
-  
-  if (g_strcmp0(filter->calibration, "off") == 0)
+ 
+  if (filter->pre_white_duration > 0)
+  {
+    filter->state = STATE_PRECALIBRATION_WHITE;
+  }
+  else if (filter->pre_marks_duration > 0)
+  {
+    filter->state = STATE_PRECALIBRATION_MARKS;
+  }
+  else if (!filter->only_calibration)
   {
     filter->state = STATE_VIDEO;
   }
+  else if (filter->post_white_duration > 0)
+  {
+    filter->state = STATE_POSTCALIBRATION;
+  }
   else
   {
-    filter->state = STATE_PRECALIBRATION_WHITE;
+    filter->state = STATE_END;
   }
   
   return true;
@@ -309,8 +321,7 @@ static gboolean gst_oftvg_video_set_caps(GstBaseTransform* object, GstCaps* inca
     return false;
   }
   
-  bool rgb6_white = (g_str_has_prefix(filter->calibration, "rgb6"));
-  if (!filter->process->init_layout(filter->location, rgb6_white))
+  if (!filter->process->init_layout(filter->location, filter->rgb6_calibration))
   {
     GST_ELEMENT_ERROR(filter, RESOURCE, NOT_FOUND,
                       ("Failed to load layout %s", filter->location), (NULL));
@@ -342,7 +353,7 @@ static gboolean gst_oftvg_video_sink_event(GstBaseTransform *object, GstEvent *e
   else if (GST_EVENT_TYPE(event) == GST_EVENT_EOS)
   {
     /* If post-calibration was requested, make sure that it was done. */
-    if (filter->state != STATE_END && g_str_has_suffix(filter->calibration, "both"))
+    if (filter->state != STATE_END && filter->post_white_duration > 0)
     {
       GST_ELEMENT_WARNING(filter, STREAM, FAILED,
                           ("Stream ended unexpectedly, is num_buffers too large?"
@@ -411,7 +422,22 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
     
     if (buffer_end_time >= filter->pre_white_duration * GST_MSECOND)
     {
-      filter->state = STATE_PRECALIBRATION_MARKS;
+      if (filter->pre_marks_duration > 0)
+      {
+        filter->state = STATE_PRECALIBRATION_MARKS;
+      }
+      else if (!filter->only_calibration)
+      {
+        filter->state = STATE_VIDEO;
+      }
+      else if (filter->post_white_duration > 0)
+      {
+	filter->state = STATE_POSTCALIBRATION;
+      }
+      else
+      {
+        filter->state = STATE_END;
+      } 
     }
   }
   else if (filter->state == STATE_PRECALIBRATION_MARKS)
@@ -420,15 +446,20 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
     
     if (buffer_end_time >= (filter->pre_white_duration + filter->pre_marks_duration) * GST_MSECOND)
     {
-      if (g_strcmp0(filter->calibration, "only") == 0)
+      if (!filter->only_calibration)
       {
-        GST_DEBUG("Precalibration=only is done");
+        GST_DEBUG("Precalibration is done");
+        filter->state = STATE_VIDEO;
+      }
+      else if(filter->post_white_duration > 0)
+      {
+	GST_DEBUG("Precalibration=only is done");
         filter->state = STATE_POSTCALIBRATION;
       }
       else
       {
-        GST_DEBUG("Precalibration is done");
-        filter->state = STATE_VIDEO;
+	GST_DEBUG("Precalibration=only is done");
+        filter->state = STATE_END;
       }
     }
   }
@@ -458,7 +489,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
       /* Easy case: a fixed number of buffers */
       if (filter->frame_counter >= filter->num_buffers)
       {
-        if (g_str_has_suffix(filter->calibration, "both"))
+        if (filter->post_white_duration > 0)
         {
           GST_DEBUG("Given number of frames processed, going into postcalibration");
           filter->state = STATE_POSTCALIBRATION;
@@ -475,7 +506,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
       /* Otherwise try to stop earlier to leave enough time for postcalibration */
       if (buffer_end_time + (filter->post_white_duration + 1000) * GST_MSECOND >= filter->end_of_video)
       {
-        if (g_str_has_suffix(filter->calibration, "both"))
+        if (filter->post_white_duration > 0)
         {
           GST_DEBUG("Close to end of video, going into postcalibration");
           filter->state = STATE_POSTCALIBRATION;
