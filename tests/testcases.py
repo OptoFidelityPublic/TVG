@@ -35,15 +35,17 @@ class TestBasicVideo(TestCase):
       'AUDIOCOMPRESSION':  'avenc_ac3',
       'NUM_BUFFERS':       '256',
       'LIPSYNC':           '-1',
-      'CALIBRATION':       'prepend',
+      'PRE_WHITE_DURATION':'5000',
+	  'PRE_MARKS_DURATION':'0',
+	  'POST_WHITE_DURATION':'0',
       'OUTPUT':            'output.avi'
     }
     
     r = tr.run_test(params)
     
     self.assert_equals(r['demuxer'],         'avidemux')
-    self.assert_equals(r['video_codec'],     'jpegdec')
-    self.assert_equals(r['audio_codec'],     'a52dec')
+    self.assert_equals(r['video_decoder'],     'jpegdec')
+    self.assert_equals(r['audio_decoder'],     'a52dec')
     self.assert_equals(r['resolution'],      [1920, 1080])
     self.assert_equals(r['framerate'],       24.0)
     self.assert_equals(r['markers_found'],   27)
@@ -70,7 +72,9 @@ class TestLipsync(TestCase):
       'AUDIOCOMPRESSION':  'identity',
       'NUM_BUFFERS':       '240',
       'LIPSYNC':           '2000',
-      'CALIBRATION':       'both',
+      'PRE_WHITE_DURATION':'5000',
+	  'PRE_MARKS_DURATION':'0',
+	  'POST_WHITE_DURATION':'5000',
       'OUTPUT':            'output.mov',
       'PREPROCESS':        '! videoscale ! video/x-raw,width=640,height=480',
       'LAYOUT':            os.path.join(tr.tvg_path, "layout_fpsonly.bmp")
@@ -79,8 +83,8 @@ class TestLipsync(TestCase):
     r = tr.run_test(params)
     
     self.assert_equals(r['demuxer'],         'qtdemux')
-    self.assert_equals(r['video_codec'],     'avdec_h264')
-    self.assert_equals(r['audio_codec'],     '(null)')
+    self.assert_equals(r['video_decoder'],     'avdec_h264')
+    self.assert_equals(r['audio_decoder'],     '(null)')
     self.assert_equals(r['resolution'],      [640, 480])
     self.assert_equals(r['framerate'],       24.0)
     self.assert_equals(r['markers_found'],   1)
