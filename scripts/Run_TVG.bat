@@ -67,12 +67,21 @@ SET NUM_BUFFERS=256
 :: Interval of lipsync markers in milliseconds (-1 to disable)
 SET LIPSYNC=-1
 
-:: Whether to create a calibration video
-:: - off      No calibration sequence
-:: - only     Only the calibration sequence, ie. create a separate calibration video
-:: - prepend  Put the calibration sequence before the actual video
-:: - both     Both at start and end (for Video Multimeter)
-SET CALIBRATION=both
+:: If true, only the calibration sequences are applied, ie. this creates
+:: a separate calibration video
+SET ONLY_CALIBRATION=false
+
+:: If true, white color during calibration sequence is only placed in the marker area
+SET RGB6_CALIBRATION=false
+
+:: Parameters (in milliseconds) for:
+:: - pre calibration white screen duration 
+:: - pre calibration markers duration
+:: - post calibration white screen duration
+:: If you want no calibration sequence to be added, just set these parameters to 0.
+SET PRE_WHITE_DURATION=4000
+SET PRE_MARKS_DURATION=1000
+SET POST_WHITE_DURATION=5000
 
 :: You can put just the settings you want to change in a file named something.tvg
 :: and open it with Run_TVG.bat as the program.
@@ -98,8 +107,9 @@ set QUEUE=queue max-size-bytes=100000000 max-size-time=10000000000
 :: Actual command that executes gst-launch
 gst-launch-1.0 -q ^
 	filesrc location="%INPUT%" ! autoaudio_decodebin name=decode %PREPROCESS% ! %QUEUE% ^
-        ! oftvg location="%LAYOUT%" num-buffers=%NUM_BUFFERS% calibration=%CALIBRATION% ^
-                name=oftvg lipsync=%LIPSYNC% ^
+        ! oftvg location="%LAYOUT%" num-buffers=%NUM_BUFFERS% only_calibration=%ONLY_CALIBRATION% ^
+        rgb6_calibration=%RGB6_CALIBRATION% pre_white_duration=%PRE_WHITE_DURATION% pre_marks_duration=%PRE_MARKS_DURATION% ^
+	post_white_duration=%POST_WHITE_DURATION% name=oftvg lipsync=%LIPSYNC% ^
         ! queue ! videoconvert ! %COMPRESSION% ! %QUEUE% ! %CONTAINER% name=mux ! filesink location="%OUTPUT%" ^
         decode. ! audioconvert ! volume volume=0.5 ! %QUEUE% ! oftvg. ^
         oftvg. ! queue ! audioconvert ! %AUDIOCOMPRESSION% ! %QUEUE% ! mux.
