@@ -40,6 +40,12 @@ void layout_process(layout_t *layout, const uint8_t *frame, int stride);
  * Returns array of marker_t structures. */
 GArray* layout_fetch(layout_t *layout);
 
+/* Fetch coordinates of the most changing pixel in the video */
+void layout_most_changing_pixel(layout_t *layout, int *x, int *y);
+
+/* Sample color value around a given pixel */
+char* layout_sample_color(const uint8_t *frame, int stride, int x, int y);
+
 /* Collect the current marker states in the video frame.
  * Returns a string of 'wrgbcmyk' characters, one for each marker. */
 char* layout_read_markers(GArray* markers, const uint8_t *frame, int stride);

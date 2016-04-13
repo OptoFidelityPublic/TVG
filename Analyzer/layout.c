@@ -29,6 +29,10 @@ struct _layout_t
   
   /* Pixel color after the previous large change. */
   uint32_t *pixel_colors;
+  
+  /* Sum of total pixel color changes */
+  uint32_t *pixel_prevcolor;
+  uint32_t *pixel_changesum;
 };
 
 layout_t *layout_create(int width, int height)
@@ -44,6 +48,8 @@ layout_t *layout_create(int width, int height)
   layout->max_values = g_malloc(width * height * 4);
   layout->pixel_crcs = g_malloc(width * height * 4);
   layout->pixel_colors = g_malloc(width * height * 4);
+  layout->pixel_prevcolor = g_malloc(width * height * 4);
+  layout->pixel_changesum = g_malloc(width * height * 4);
   
   memset(layout->good_mask, 1, width * height);
   memset(layout->blackwhite, 1, width * height);
@@ -51,6 +57,8 @@ layout_t *layout_create(int width, int height)
   memset(layout->max_values, 0, width * height * 4);
   memset(layout->pixel_crcs, 1, width * height * 4);
   memset(layout->pixel_colors, 0, width * height * 4);
+  memset(layout->pixel_prevcolor, 0, width * height * 4);
+  memset(layout->pixel_changesum, 0, width * height * 4);
   
   return layout;
 }
@@ -62,6 +70,8 @@ void layout_free(layout_t *layout)
   g_free(layout->min_values); layout->min_values = NULL;
   g_free(layout->max_values); layout->max_values = NULL;
   g_free(layout->pixel_crcs); layout->pixel_crcs = NULL;
+  g_free(layout->pixel_prevcolor); layout->pixel_prevcolor = NULL;
+  g_free(layout->pixel_changesum); layout->pixel_changesum = NULL;
   g_free(layout);
 }
 
@@ -152,6 +162,22 @@ void layout_process(layout_t *layout, const uint8_t *frame, int stride)
             }
           }
         }
+      }
+      
+      /* Keep track of the most changing pixel (for use by camera fps) */
+      {
+        int r = frame[y * stride + x * 4 + 0];
+        int g = frame[y * stride + x * 4 + 1];
+        int b = frame[y * stride + x * 4 + 2];
+        uint32_t newcolor = (r << 16) | (g << 8) | b;
+        uint32_t oldcolor = layout->pixel_prevcolor[index_pixel];
+        int oldr = (oldcolor >> 16) & 0xFF;
+        int oldg = (oldcolor >> 8) & 0xFF;
+        int oldb = (oldcolor >> 0) & 0xFF;
+        int change = abs(r-oldr) + abs(g-oldg) + abs(b-oldb);
+        
+        layout->pixel_changesum[index_pixel] += change;
+        layout->pixel_prevcolor[index_pixel] = newcolor;
       }
     }
   }
@@ -313,6 +339,52 @@ GArray* layout_fetch(layout_t *layout)
   find_markers(layout, result);
   
   return result;
+}
+
+void layout_most_changing_pixel(layout_t *layout, int *x, int *y)
+{
+  uint32_t largest = 0;
+  int py, px;
+  
+  *x = *y = 0;
+  
+  for (py = 5; py < layout->height - 5; py++)
+  {
+    for (px = 5; px < layout->width - 5; px++)
+    {
+      int index_pixel = py * layout->width + px;
+      if (layout->pixel_changesum[index_pixel] >= largest)
+      {
+        *x = px;
+        *y = py;
+        largest = layout->pixel_changesum[index_pixel];
+      }
+    }
+  }
+}
+
+char* layout_sample_color(const uint8_t *frame, int stride, int x, int y)
+{
+  int r = 0, g = 0, b = 0;
+  int count = 0;
+  int py, px;
+  
+  for (py = y - 2; py <= y + 2; py++)
+  {
+    for (px = x - 2; px <= x + 2; px++)
+    {
+      r += frame[py * stride + px * 4 + 0];
+      g += frame[py * stride + px * 4 + 1];
+      b += frame[py * stride + px * 4 + 2];
+      count++;
+    }
+  }
+  
+  r /= count;
+  g /= count;
+  b /= count;
+  
+  return g_strdup_printf("#%02x%02x%02x", r, g, b);
 }
 
 char* layout_read_markers(GArray* markers, const uint8_t *frame, int stride)

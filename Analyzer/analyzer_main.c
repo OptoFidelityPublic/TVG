@@ -16,6 +16,8 @@ typedef struct {
   GArray *lipsync_markers; /* lipsync_marker_t, detected beeps */
   GArray *frame_data; /* char*, detected marker states in frames */
   GArray *frame_times; /* GstClockTime */
+  int mc_x, mc_y; /* Coordinates for most changing pixel */
+  GArray *frame_colors; /* char*, detected marker color for most changing pixel */
   GArray *warnings;
   int rgb6_marker_index; /* Index of the RGB6 marker */
   int samplerate; /* Audio samplerate */
@@ -154,7 +156,9 @@ bool first_pass(main_state_t *main_state, GError **error)
   }
   
   main_state->markers = layout_fetch(layout_state);
+  layout_most_changing_pixel(layout_state, &main_state->mc_x, &main_state->mc_y);
   printf("    \"markers_found\":%8d,\n", main_state->markers->len);
+  printf("    \"most_changing_pixel\": [%4d,%4d],\n", main_state->mc_x, main_state->mc_y);
   
   loader_close(loader_state);
   layout_free(layout_state);
@@ -181,6 +185,7 @@ bool second_pass(main_state_t *main_state, GError **error)
   lipsync_state = lipsync_create(main_state->samplerate);
   main_state->frame_data = g_array_new(false, false, sizeof(char*));
   main_state->frame_times = g_array_new(false, false, sizeof(GstClockTime));
+  main_state->frame_colors = g_array_new(false, false, sizeof(char*));
   
   int num_frames = 0;
   GstBuffer *audio_buf, *video_buf;
@@ -201,8 +206,10 @@ bool second_pass(main_state_t *main_state, GError **error)
         gst_buffer_map(video_buf, &mapinfo, GST_MAP_READ);
         
         char *states = layout_read_markers(main_state->markers, mapinfo.data, stride);
+        char *color = layout_sample_color(mapinfo.data, stride, main_state->mc_x, main_state->mc_y);
         g_array_append_val(main_state->frame_data, states);
         g_array_append_val(main_state->frame_times, video_buf->pts);
+        g_array_append_val(main_state->frame_colors, color);
         
         gst_buffer_unmap(video_buf, &mapinfo);
       }
@@ -351,6 +358,7 @@ static void save_details(main_state_t *main_state)
   {
     GstClockTime frame_time = 0;
     char *frame_data = NULL;
+    char *frame_color = NULL;
     
     /* On the last iteration, process all the beeps that come after the last video frame */
     bool last = (frame_index == main_state->frame_data->len);
@@ -359,6 +367,7 @@ static void save_details(main_state_t *main_state)
     {
       frame_time = g_array_index(main_state->frame_times, GstClockTime, frame_index);
       frame_data = g_array_index(main_state->frame_data, char*, frame_index);
+      frame_color = g_array_index(main_state->frame_colors, char*, frame_index);
     }
     
     while (lipsync_index < main_state->lipsync_markers->len)
@@ -383,7 +392,7 @@ static void save_details(main_state_t *main_state)
     
     if (!last)
     {
-      fprintf(f, "VIDEO: %8d %s\n", (int)(frame_time / GST_USECOND), frame_data);
+      fprintf(f, "VIDEO: %8d %s %s\n", (int)(frame_time / GST_USECOND), frame_data, frame_color);
     }
   }
   
