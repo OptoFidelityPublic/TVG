@@ -193,24 +193,24 @@ static int gst_oftvg_get_subsampling_v_shift(GstVideoInfo *info,
 /* Color values to use for YUV videos */
 static guint8 color_array_yuv[20][4] = {
   {   0, 128, 128, 0}, /* Black */
-  { 128,  64, 255, 0}, /* Red */
+  { 100,  70, 255, 0}, /* Red */
   { 128,   0,   0, 0}, /* Green */
-  { 255,   0, 128, 0}, /* Yellow */
-  {  64, 255,   0, 0}, /* Blue */
-  { 128, 255, 255, 0}, /* Magenta */
-  { 255, 255,   0, 0}, /* Cyan */
+  { 220,   0, 150, 0}, /* Yellow */ // 200,0,150
+  {  30, 220, 120, 0}, /* Blue */
+  {  70, 190, 250, 0}, /* Magenta */ // 70,190,220
+  { 160, 135,   0, 0}, /* Cyan */ // 120,160,0
   { 255, 128, 128, 0}  /* White */
 };
 
 /* Color values to use for RGB videos */
 static guint8 color_array_rgb[20][4] = {
   {   0,   0,   0, 0}, /* Black */
-  { 255,   0,   0, 0}, /* Red */
+  { 255,  30,   0, 0}, /* Red */
   {   0, 255,   0, 0}, /* Green */
-  { 255, 255,   0, 0}, /* Yellow */
-  {   0,   0, 255, 0}, /* Blue */
-  { 255,   0, 255, 0}, /* Magenta */
-  {   0, 255, 255, 0}, /* Cyan */
+  { 250, 250,   0, 0}, /* Yellow */
+  {  20,   5, 180, 0}, /* Blue */
+  { 240,   0, 175, 0}, /* Magenta */
+  {   0, 250, 170, 0}, /* Cyan */
   { 255, 255, 255, 0}  /* White */
 };
 
