@@ -45,6 +45,9 @@ for f in $BINFILES
     do pick bin/$f gstreamer/bin
 done
 
+# GStreamer external plugin scanner
+pick libexec/gstreamer-1.0/gst-plugin-scanner gstreamer/bin
+
 # Copy GStreamer library dependencies
 for f in $(cat distribution/sos_to_include.txt)
     do pick "lib/$f" gstreamer/lib
