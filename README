@@ -7,9 +7,6 @@ available at https://github.com/OptoFidelity/TVG/releases
 Compiling (for Windows 64-bit target, on 64-bit Linux host):
 
 1. Checkout newest cerbero from Git repo.
-   Note: do not place it directly in ~, because ~/cerbero will be used for
-         temp files during build.
-   
    mkdir ~/dev; cd ~/dev
    git clone https://github.com/OptoFidelity/cerbero.git
    # (You can also use upstream git://anongit.freedesktop.org/gstreamer/sdk/cerbero)
@@ -24,19 +21,16 @@ Compiling (for Windows 64-bit target, on 64-bit Linux host):
 3. Checkout the oftvg repo.
 
 4. Build oftvg using the included config file
-   ./cerbero-uninstalled -c ~/oftvg/cerbero/cross-win64.cbc build oftvg 
+   ./cerbero-uninstalled -c ~/dev/oftvg/cerbero/cross-win64.cbc build oftvg 
 
 5. Run the packaging script:
-   distribution/make_windows_pkg.sh ~/cerbero/dist/windows_x86_64
+   distribution/make_windows_pkg.sh ~/dev/cerbero/build/dist/windows_x86_64
 
 --
 
 Compiling (for Linux 64-bit target, on 64-bit Linux host):
 
 1. Checkout newest cerbero from Git repo.
-   Note: do not place it directly in ~, because ~/cerbero will be used for
-         temp files during build.
-   
    mkdir ~/dev; cd ~/dev
    git clone https://github.com/OptoFidelity/cerbero.git
    # (You can also use upstream git://anongit.freedesktop.org/gstreamer/sdk/cerbero)
@@ -49,10 +43,10 @@ Compiling (for Linux 64-bit target, on 64-bit Linux host):
 3. Checkout the oftvg repo.
 
 4. Build oftvg using the included config file
-   ./cerbero-uninstalled -c ~/oftvg/cerbero/linux.config build oftvg 
+   ./cerbero-uninstalled -c ~/dev/oftvg/cerbero/linux.config build oftvg 
 
 5. Run the packaging script:
-   distribution/make_linux_pkg.sh ~/cerbero/dist/linux_x86_64
+   distribution/make_linux_pkg.sh ~/dev/cerbero/build/dist/linux_x86_64
 
 Note that the distribution version you use to build will determine the minimum
 system requirements for the built package. For example, it will not run with

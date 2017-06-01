@@ -37,9 +37,10 @@ libgstsdp-1.0.so*
 libgsttag-1.0.so*
 libgsturidownloader-1.0.so*
 libgstvalidate-1.0.so*
+libgstvalidatevideo-1.0.so*
 libgstvideo-1.0.so*
 libjpeg.so*
-libmad.so*
+libjson-glib-1.0.so*
 libmms.so*
 libmpeg2.so*
 libnettle.so*
@@ -52,7 +53,6 @@ liborc-test-0.4.so*
 libpango-1.0.so*
 libpangocairo-1.0.so*
 libpng16.so*
-libschroedinger-1.0.so*
 libsoup-2.4.so*
 libspeex.so*
 libtag.so*

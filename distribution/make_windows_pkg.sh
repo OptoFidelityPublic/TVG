@@ -55,7 +55,7 @@ done
 
 # Strip debug symbols from files. This reduces the
 # size of the distributed package.
-STRIP=~/cerbero/mingw/w64/bin/x86_64-w64-mingw32-strip
+STRIP=$BUILDDIR/../../mingw/w64/bin/x86_64-w64-mingw32-strip
 rm -rf $PKGDIR-debug
 mkdir -p $PKGDIR-debug
 for f in $PKGDIR/gstreamer/bin/*.exe \

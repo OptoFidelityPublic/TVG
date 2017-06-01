@@ -2,7 +2,7 @@
 
 if [ x$1 == x ]
 then echo "
-usage: $0 ~/cerbero/dist/linux_x86_64
+usage: $0 ~/dev/cerbero/build/dist/linux_x86_64
 
 This script creates a distribution package for OptoFidelity
 Test Video Generator. The argument should be a path to the

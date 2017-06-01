@@ -10,7 +10,7 @@ exit 1
 fi
 
 # Path to the mingw objdump
-OBJDUMP=~/cerbero/mingw/w64/bin/x86_64-w64-mingw32-objdump
+OBJDUMP=~/dev/cerbero/build/mingw/w64/bin/x86_64-w64-mingw32-objdump
 
 # Process each file through objdump
 DLLS=""

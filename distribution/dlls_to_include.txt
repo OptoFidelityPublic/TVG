@@ -27,7 +27,6 @@ libopus-0.dll
 liborc-test-0.4-0.dll
 libpango-1.0-0.dll
 libpangocairo-1.0-0.dll
-libschroedinger-1.0-0.dll
 libsoup-2.4-1.dll
 libspeex-1.dll
 libtag.dll
@@ -41,7 +40,7 @@ libx264-*.dll
 libglib-2.0-0.dll
 libgobject-2.0-0.dll
 libintl-8.dll
-libffi-6.dll
+libffi-7.dll
 libgstpbutils-1.0-0.dll
 libgstreamer-1.0-0.dll
 libexpat-1.dll
@@ -63,6 +62,7 @@ libstdc++-6.dll
 libgio-2.0-0.dll
 libgsttag-1.0-0.dll
 libjpeg-8.dll
+libjson-glib-1.0-0.dll
 liborc-0.4-0.dll
 libpng*.dll
 libtiff-5.dll
@@ -70,6 +70,7 @@ libz.dll
 libgstmpegts-1.0-0.dll
 libgsturidownloader-1.0-0.dll
 libgstvalidate-1.0-0.dll
+libgstvalidatevideo-1.0-0.dll
 libharfbuzz-0.dll
-libnettle-4-7.dll
+libnettle-6.dll
 libx265.dll
