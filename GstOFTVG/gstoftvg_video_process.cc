@@ -219,26 +219,26 @@ void OFTVG_Video_Process::process_with_layout(GstBuffer *buf, GstOFTVGLayout *la
                                               int frame_index, OFTVG::FrameFlags flags)
 {
   /* Map the buffer data to memory */
-  GstMapInfo mapinfo;
-  if (!gst_buffer_map(buf, &mapinfo, GST_MAP_WRITE))
+  GstVideoFrame frame = {};
+  if (!gst_video_frame_map(&frame, &in_info, buf, GST_MAP_WRITE))
   {
     GST_ERROR("Could not map buffer");
     return;
   }
   
   /* Compute pointers to color components in the buffer */
-  guint8* const bufY = mapinfo.data + GST_VIDEO_INFO_COMP_OFFSET(&in_info, 0);
-  guint8* const bufU = mapinfo.data + GST_VIDEO_INFO_COMP_OFFSET(&in_info, 1);
-  guint8* const bufV = mapinfo.data + GST_VIDEO_INFO_COMP_OFFSET(&in_info, 2);
+  guint8* const bufY = GST_VIDEO_FRAME_COMP_DATA(&frame, 0);
+  guint8* const bufU = GST_VIDEO_FRAME_COMP_DATA(&frame, 1);
+  guint8* const bufV = GST_VIDEO_FRAME_COMP_DATA(&frame, 2);
   
   /* Length of lines in bytes */
-  int y_stride       = GST_VIDEO_INFO_COMP_STRIDE(&in_info, 0);
-  int uv_stride      = GST_VIDEO_INFO_COMP_STRIDE(&in_info, 1);
+  int y_stride       = GST_VIDEO_FRAME_COMP_STRIDE(&frame, 0);
+  int uv_stride      = GST_VIDEO_FRAME_COMP_STRIDE(&frame, 1);
   
   /* Increment between pixels in bytes */
-  int yoff           = GST_VIDEO_FORMAT_INFO_PSTRIDE(in_format_info, 0);
-  int uoff           = GST_VIDEO_FORMAT_INFO_PSTRIDE(in_format_info, 1);
-  int voff           = GST_VIDEO_FORMAT_INFO_PSTRIDE(in_format_info, 2);
+  int yoff           = GST_VIDEO_FRAME_COMP_PSTRIDE(&frame, 0);
+  int uoff           = GST_VIDEO_FRAME_COMP_PSTRIDE(&frame, 1);
+  int voff           = GST_VIDEO_FRAME_COMP_PSTRIDE(&frame, 2);
   
   /* Subsampling of color components */
   int h_subs         = gst_oftvg_get_subsampling_h_shift(&in_info, 1, width);
@@ -286,5 +286,5 @@ void OFTVG_Video_Process::process_with_layout(GstBuffer *buf, GstOFTVGLayout *la
     }
   }
 
-  gst_buffer_unmap(buf, &mapinfo);
+  gst_video_frame_unmap(&frame);
 }
