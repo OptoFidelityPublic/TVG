@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <gst/gst.h>
 #include "loader.h"
 #include "layout.h"
@@ -139,20 +140,15 @@ bool first_pass(main_state_t *main_state, GError **error)
   printf("    \"video_length\": %8.3f,\n", (float)video_end_time / GST_SECOND);
   printf("    \"audio_length\": %8.3f,\n", (float)audio_end_time / GST_SECOND);
   
-  if (video_start_time > GST_MSECOND && GST_CLOCK_TIME_IS_VALID(video_start_time))
+  if (GST_CLOCK_TIME_IS_VALID(video_start_time) && GST_CLOCK_TIME_IS_VALID(audio_start_time))
   {
-    gchar* m = g_strdup_printf(
-      "Video time does not start from 0 (offset = %0.3f s)",
-      (float)video_start_time / GST_SECOND);
-    g_array_append_val(main_state->warnings, m);          
-  }
-  
-  if (audio_start_time > GST_MSECOND && GST_CLOCK_TIME_IS_VALID(audio_start_time))
-  {
-    gchar* m = g_strdup_printf(
-      "Audio time does not start from 0 (offset = %0.3f s)",
-      (float)audio_start_time / GST_SECOND);
-    g_array_append_val(main_state->warnings, m);    
+    if (abs(video_start_time - audio_start_time) > GST_MSECOND)
+    {
+      gchar* m = g_strdup_printf(
+        "Audio and video start at different times (audio = %0.3f s, video = %0.3f s)",
+        (float)audio_start_time / GST_SECOND, (float)video_start_time / GST_SECOND);
+      g_array_append_val(main_state->warnings, m);
+    }
   }
   
   main_state->markers = layout_fetch(layout_state);
@@ -223,7 +219,7 @@ bool second_pass(main_state_t *main_state, GError **error)
         GstMapInfo mapinfo;
         gst_buffer_map(audio_buf, &mapinfo, GST_MAP_READ);
         
-        lipsync_process(lipsync_state, (const int16_t*)mapinfo.data, mapinfo.size / 2);
+        lipsync_process(lipsync_state, audio_buf->pts, main_state->samplerate, (const int16_t*)mapinfo.data, mapinfo.size / 2);
         
         gst_buffer_unmap(audio_buf, &mapinfo);
       }
@@ -311,9 +307,8 @@ static void print_lipsync_info(main_state_t *main_state)
                                                     GstClockTime, frame_index);
         lipsync_marker_t beep = g_array_index(main_state->lipsync_markers,
                                               lipsync_marker_t, beep_index++);
-        GstClockTimeDiff beep_start = beep.start_sample * GST_SECOND / main_state->samplerate;
         
-        float delta = (float)(beep_start - frame_time) / GST_SECOND;
+        float delta = (float)((GstClockTimeDiff)beep.start_time - frame_time) / GST_SECOND;
         
         if (video_markers == 0)
         {
@@ -373,14 +368,14 @@ static void save_details(main_state_t *main_state)
     while (lipsync_index < main_state->lipsync_markers->len)
     {
       lipsync_marker_t beep = g_array_index(main_state->lipsync_markers, lipsync_marker_t, lipsync_index);
-      GstClockTime beep_start = beep.start_sample * GST_SECOND / main_state->samplerate;
-      GstClockTime beep_end = beep.end_sample * GST_SECOND / main_state->samplerate;
+      GstClockTime beep_start = beep.start_time;
+      GstClockTime beep_length = (beep.end_sample - beep.start_sample) * GST_SECOND / main_state->samplerate;
       
       if (last || beep_start <= frame_time)
       {
         fprintf(f, "AUDIO: %8d %5d\n",
                 (int)(beep_start / GST_USECOND),
-                (int)((beep_end - beep_start) / GST_USECOND)
+                (int)(beep_length / GST_USECOND)
               );
         lipsync_index++;
       }

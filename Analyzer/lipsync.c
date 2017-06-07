@@ -59,10 +59,12 @@ static void add_sample(lipsync_t *lipsync, int16_t sample)
   lipsync->freq_2_dft += dft_term(lipsync, index, sample, TVG_LIPSYNC_FREQ2);
 }
 
-void lipsync_process(lipsync_t *lipsync, const int16_t *data, size_t num_samples)
+void lipsync_process(lipsync_t *lipsync, GstClockTime buf_start_time, int samplerate, const int16_t *data, size_t num_samples)
 {
   const int start_threshold = TVG_LIPSYNC_THRESHOLD + TVG_LIPSYNC_HYSTERESIS;
   const int end_threshold = TVG_LIPSYNC_THRESHOLD - TVG_LIPSYNC_HYSTERESIS;
+  
+  int buf_start_sample = lipsync->sample_index;
   
   size_t i;
   for (i = 0; i < num_samples; i++)
@@ -101,7 +103,12 @@ void lipsync_process(lipsync_t *lipsync, const int16_t *data, size_t num_samples
         
         if (lipsync->current_marker.start_sample < 0)
           lipsync->current_marker.start_sample = 0;
-
+        
+        /* Calculate the beep start time based on the buffer timestamp. This
+         * allows it to work accurately even when there are some discontinuities
+         * or time drift in the audio stream. */
+        lipsync->current_marker.start_time = buf_start_time + (float)(lipsync->current_marker.start_sample - buf_start_sample) * GST_SECOND / samplerate;
+        
         g_array_append_val(lipsync->detected_markers, lipsync->current_marker);
       }
     }

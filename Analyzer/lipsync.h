@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <glib.h>
+#include <gst/gst.h>
 
 #define TVG_LIPSYNC_FREQ1 547
 #define TVG_LIPSYNC_FREQ2 1823
@@ -20,6 +21,7 @@
 typedef struct _lipsync_t lipsync_t;
 
 typedef struct {
+  GstClockTime start_time;
   int start_sample;
   int end_sample;
 } lipsync_marker_t;
@@ -31,7 +33,7 @@ lipsync_t *lipsync_create(int samplerate);
 void lipsync_free(lipsync_t *lipsync);
 
 /* Feed a new buffer of audio data */
-void lipsync_process(lipsync_t *lipsync, const int16_t *data, size_t num_samples);
+void lipsync_process(lipsync_t *lipsync, GstClockTime buf_start_time, int samplerate, const int16_t *data, size_t num_samples);
 
 /* Fetch a list of all the lipsync markers detected so far.
  * Returns a new reference to internal array of lipsync_marker_t structures. */

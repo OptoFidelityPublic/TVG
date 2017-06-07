@@ -239,7 +239,7 @@ GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf
     {
       if (filter->current != NULL)
       {
-        GST_DEBUG("Releasing beep that ends at %" GST_TIME_FORMAT ", "
+        GST_DEBUG("Releasing struct that ends at %" GST_TIME_FORMAT ", "
                   "waiting for one at %" GST_TIME_FORMAT,
                   GST_TIME_ARGS(filter->current->end),
                   GST_TIME_ARGS(start_time + min_len));
