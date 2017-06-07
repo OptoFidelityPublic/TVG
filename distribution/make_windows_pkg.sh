@@ -45,6 +45,9 @@ for f in $BINFILES $(cat distribution/dlls_to_include.txt)
     do pick bin/$f gstreamer/bin
 done
 
+# GStreamer external plugin scanner
+pick libexec/gstreamer-1.0/gst-plugin-scanner gstreamer/bin
+
 # Copy GStreamer plugins
 PLUGINS=$(cat distribution/plugins_to_include.txt)
 PLATFORM_SPECIFIC="libgstd3dvideosink libgstdirectsoundsink libgstdirectsoundsrc

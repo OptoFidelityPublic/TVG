@@ -66,5 +66,6 @@ libwavpack.so*
 libx264.so*
 libx265.so*
 libxml2.so*
+libz.so*
 libexpat.so*
 libharfbuzz.so*
