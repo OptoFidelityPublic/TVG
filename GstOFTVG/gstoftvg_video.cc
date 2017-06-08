@@ -364,14 +364,15 @@ static gboolean gst_oftvg_video_sink_event(GstBaseTransform *object, GstEvent *e
     g_signal_emit(filter, gstoftvg_video_signals[SIGNAL_VIDEO_END_OF_STREAM], 0);
   }
   
-  return gst_pad_push_event (filter->element.srcpad, event);
+  return GST_BASE_TRANSFORM_CLASS(gst_oftvg_video_parent_class)->sink_event(object, event);
 }
 
 /* Process a single video frame in-place */
 static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstBuffer *buf)
 {
   GstOFTVG_Video *filter = GST_OFTVG_VIDEO(object);
-  GstClockTime buffer_end_time = GST_BUFFER_PTS(buf) + GST_BUFFER_DURATION(buf);
+  GstClockTime running_time = gst_segment_to_running_time(&object->segment, GST_FORMAT_TIME, GST_BUFFER_PTS(buf));
+  GstClockTime buffer_end_time = running_time + GST_BUFFER_DURATION(buf);
   state_t prev_state = filter->state;
   
   if (!filter->have_caps)
@@ -383,14 +384,14 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   }
   
   GST_DEBUG("Video buffer: %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT "\n",
-              GST_TIME_ARGS(GST_BUFFER_PTS(buf)),
-              GST_TIME_ARGS(GST_BUFFER_PTS(buf) + GST_BUFFER_DURATION(buf)));
+              GST_TIME_ARGS(running_time),
+              GST_TIME_ARGS(running_time + GST_BUFFER_DURATION(buf)));
   
-  if (filter->first && GST_BUFFER_PTS(buf) > GST_MSECOND)
+  if (filter->first && running_time > GST_MSECOND)
   {
     g_print("WARNING: Input video does not start at time zero (offset = %0.3f s). "
             "This can cause A/V sync issues with some video formats.\n",
-            (float)GST_BUFFER_PTS(buf) / GST_SECOND);
+            (float)running_time / GST_SECOND);
   }
   filter->first = false;
   
@@ -420,7 +421,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   {
     filter->process->process_calibration_white(buf);
     
-    if (buffer_end_time >= filter->pre_white_duration * GST_MSECOND)
+    if ((int64_t)buffer_end_time >= filter->pre_white_duration * GST_MSECOND)
     {
       if (filter->pre_marks_duration > 0)
       {
@@ -444,7 +445,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   {
     filter->process->process_calibration_marks(buf);
     
-    if (buffer_end_time >= (filter->pre_white_duration + filter->pre_marks_duration) * GST_MSECOND)
+    if ((int64_t)buffer_end_time >= (filter->pre_white_duration + filter->pre_marks_duration) * GST_MSECOND)
     {
       if (!filter->only_calibration)
       {
@@ -473,12 +474,12 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
             || buffer_end_time >= filter->lipsync_timestamp + GST_MSECOND * filter->lipsync)
        )
     {
-      GST_DEBUG("Generating lipsync at %" GST_TIME_FORMAT, GST_TIME_ARGS(GST_BUFFER_PTS(buf)));
+      GST_DEBUG("Generating lipsync at %" GST_TIME_FORMAT, GST_TIME_ARGS(running_time));
       flags = OFTVG::FRAMEFLAGS_LIPSYNC;
       filter->lipsync_timestamp = buffer_end_time;
       
       g_signal_emit(filter, gstoftvg_video_signals[SIGNAL_LIPSYNC_GENERATED], 0,
-                    GST_BUFFER_PTS(buf), buffer_end_time);
+                    running_time, buffer_end_time);
     }
     
     filter->process->process_frame(buf, filter->frame_counter, flags);
@@ -518,7 +519,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   {
     filter->process->process_calibration_white(buf);
     
-    if (buffer_end_time - filter->last_state_change >= filter->post_white_duration * GST_MSECOND)
+    if ((int64_t)(buffer_end_time - filter->last_state_change) >= filter->post_white_duration * GST_MSECOND)
     {
       filter->state = STATE_END;
     }

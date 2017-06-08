@@ -44,8 +44,8 @@ float loader_get_framerate(loader_t *state);
 
 /* Retrieve video/audio buffers. Atleast one of the returned pointers
  * is non-NULL after the call, *except* on end-of-stream when it returns false. */
-bool loader_get_buffer(loader_t *state, GstBuffer **audio_buf,
-                       GstBuffer **video_buf, GError **error);
+bool loader_get_buffer(loader_t *state, GstSample **audio_sample,
+                       GstSample **video_sample, GError **error);
 
 
 #endif

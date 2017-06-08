@@ -64,19 +64,24 @@ bool first_pass(main_state_t *main_state, GError **error)
   layout_state = layout_create(width, height);
   
   int num_frames = 0;
-  GstBuffer *audio_buf, *video_buf;
+  GstSample *audio_sample, *video_sample;
   GstClockTime video_start_time = GST_CLOCK_TIME_NONE, audio_start_time = GST_CLOCK_TIME_NONE;
   GstClockTime video_end_time = 0, audio_end_time = 0;
-  while (loader_get_buffer(loader_state, &audio_buf, &video_buf, error))
+  while (loader_get_buffer(loader_state, &audio_sample, &video_sample, error))
   {
-    if (video_buf != NULL)
+    if (video_sample != NULL)
     {
       num_frames++;
+      
+      GstBuffer *video_buf = gst_sample_get_buffer(video_sample);
+      GstClockTime video_time = gst_segment_to_running_time(gst_sample_get_segment(video_sample),
+                                                            GST_FORMAT_TIME,
+                                                            GST_BUFFER_PTS(video_buf));
       
       if (isatty(1))
       {
         GST_INFO("Processing frame %d, time %" GST_TIME_FORMAT "\n",
-                 num_frames, GST_TIME_ARGS(video_buf->pts));
+                 num_frames, GST_TIME_ARGS(video_time));
         printf("[%5d]  \r", num_frames);
         fflush(stdout);
       }
@@ -91,11 +96,11 @@ bool first_pass(main_state_t *main_state, GError **error)
       if (!GST_CLOCK_TIME_IS_VALID(video_start_time))
       {
         /* First frame */
-        video_start_time = video_buf->pts;
+        video_start_time = video_time;
       }
       else
       {
-        GstClockTimeDiff delta = GST_CLOCK_DIFF(video_end_time, video_buf->pts);
+        GstClockTimeDiff delta = GST_CLOCK_DIFF(video_end_time, video_time);
         if (delta < -GST_MSECOND || delta > GST_MSECOND)
         {
           gchar* m = g_strdup_printf(
@@ -105,19 +110,25 @@ bool first_pass(main_state_t *main_state, GError **error)
         }
       }
       
-      video_end_time = video_buf->pts + video_buf->duration;
-      gst_buffer_unref(video_buf);
+      video_end_time = video_time + video_buf->duration;
+      gst_sample_unref(video_sample);
     }
     
-    if (audio_buf != NULL)
+    if (audio_sample != NULL)
     {
+      GstBuffer *audio_buf = gst_sample_get_buffer(audio_sample);
+      GstClockTime audio_time = gst_segment_to_running_time(gst_sample_get_segment(audio_sample),
+                                                            GST_FORMAT_TIME,
+                                                            GST_BUFFER_PTS(audio_buf));
+      
+      
       if (!GST_CLOCK_TIME_IS_VALID(audio_start_time))
       {
-        audio_start_time = audio_buf->pts;
+        audio_start_time = audio_time;
       }
       else
       {
-        GstClockTimeDiff delta = GST_CLOCK_DIFF(audio_end_time, audio_buf->pts);
+        GstClockTimeDiff delta = GST_CLOCK_DIFF(audio_end_time, audio_time);
         if (delta < -GST_MSECOND || delta > GST_MSECOND)
         {
           gchar* m = g_strdup_printf(
@@ -127,7 +138,7 @@ bool first_pass(main_state_t *main_state, GError **error)
         }
       }
       
-      audio_end_time = audio_buf->pts + audio_buf->duration;
+      audio_end_time = audio_time + audio_buf->duration;
       gst_buffer_unref(audio_buf);
     }
     
@@ -184,10 +195,10 @@ bool second_pass(main_state_t *main_state, GError **error)
   main_state->frame_colors = g_array_new(false, false, sizeof(char*));
   
   int num_frames = 0;
-  GstBuffer *audio_buf, *video_buf;
-  while (loader_get_buffer(loader_state, &audio_buf, &video_buf, error))
+  GstSample *audio_sample, *video_sample;
+  while (loader_get_buffer(loader_state, &audio_sample, &video_sample, error))
   {
-    if (video_buf != NULL)
+    if (video_sample != NULL)
     {
       num_frames++;
       
@@ -197,6 +208,11 @@ bool second_pass(main_state_t *main_state, GError **error)
         fflush(stdout);
       }
       
+      GstBuffer *video_buf = gst_sample_get_buffer(video_sample);
+      GstClockTime video_time = gst_segment_to_running_time(gst_sample_get_segment(video_sample),
+                                                            GST_FORMAT_TIME,
+                                                            GST_BUFFER_PTS(video_buf));
+      
       {
         GstMapInfo mapinfo;
         gst_buffer_map(video_buf, &mapinfo, GST_MAP_READ);
@@ -204,7 +220,7 @@ bool second_pass(main_state_t *main_state, GError **error)
         char *states = layout_read_markers(main_state->markers, mapinfo.data, stride);
         char *color = layout_sample_color(mapinfo.data, stride, main_state->mc_x, main_state->mc_y);
         g_array_append_val(main_state->frame_data, states);
-        g_array_append_val(main_state->frame_times, video_buf->pts);
+        g_array_append_val(main_state->frame_times, video_time);
         g_array_append_val(main_state->frame_colors, color);
         
         gst_buffer_unmap(video_buf, &mapinfo);
@@ -213,13 +229,19 @@ bool second_pass(main_state_t *main_state, GError **error)
       gst_buffer_unref(video_buf);
     }
     
-    if (audio_buf != NULL)
+    if (audio_sample != NULL)
     {
+      GstBuffer *audio_buf = gst_sample_get_buffer(audio_sample);
+      GstClockTime audio_time = gst_segment_to_running_time(gst_sample_get_segment(audio_sample),
+                                                            GST_FORMAT_TIME,
+                                                            GST_BUFFER_PTS(audio_buf));
+      
       {
         GstMapInfo mapinfo;
         gst_buffer_map(audio_buf, &mapinfo, GST_MAP_READ);
         
-        lipsync_process(lipsync_state, audio_buf->pts, main_state->samplerate, (const int16_t*)mapinfo.data, mapinfo.size / 2);
+        lipsync_process(lipsync_state, audio_time, main_state->samplerate,
+                        (const int16_t*)mapinfo.data, mapinfo.size / 2);
         
         gst_buffer_unmap(audio_buf, &mapinfo);
       }

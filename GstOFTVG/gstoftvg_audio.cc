@@ -214,16 +214,18 @@ GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf
     gst_caps_unref(caps);
   }
   
+  GstClockTime running_time = gst_segment_to_running_time(&src->segment, GST_FORMAT_TIME, GST_BUFFER_PTS(buf));
+  
   GST_DEBUG("Incoming buffer: %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT " (%d samples)",
-            GST_TIME_ARGS(GST_BUFFER_PTS(buf)),
-            GST_TIME_ARGS(GST_BUFFER_PTS(buf) + GST_BUFFER_DURATION(buf)),
+            GST_TIME_ARGS(running_time),
+            GST_TIME_ARGS(running_time + GST_BUFFER_DURATION(buf)),
             buflen);
   
-  if (filter->first && GST_BUFFER_PTS(buf) > GST_MSECOND)
+  if (filter->first && running_time > GST_MSECOND)
   {
     g_print("WARNING: Input audio does not start at time zero (offset = %0.3f s). "
             "This can cause A/V sync issues with some video formats.\n",
-            (float)GST_BUFFER_PTS(buf) / GST_SECOND);
+            (float)running_time / GST_SECOND);
   }
   filter->first = false;
   
@@ -231,7 +233,7 @@ GstFlowReturn gst_oftvg_audio_transform_ip(GstBaseTransform *src, GstBuffer *buf
   while (offset < buflen && !filter->end_of_stream)
   {
     /* Calculate timestamp at this offset */
-    GstClockTime start_time = GST_BUFFER_PTS(buf) + GST_SECOND * offset / samplerate;
+    GstClockTime start_time = running_time + GST_SECOND * offset / samplerate;
     
     /* Fetch a new beep entry if needed */
     int min_len = GST_SECOND / samplerate;

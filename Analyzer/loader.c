@@ -469,11 +469,11 @@ float loader_get_framerate(loader_t *state)
   }
 }
 
-bool loader_get_buffer(loader_t *state, GstBuffer **audio_buf,
-                       GstBuffer **video_buf, GError **error)
+bool loader_get_buffer(loader_t *state, GstSample **audio_sample,
+                       GstSample **video_sample, GError **error)
 {
-  *audio_buf = NULL;
-  *video_buf = NULL;
+  *audio_sample = NULL;
+  *video_sample = NULL;
   *error = NULL;
   
   do
@@ -498,12 +498,12 @@ bool loader_get_buffer(loader_t *state, GstBuffer **audio_buf,
       GstSample *sample = gst_app_sink_pull_sample(GST_APP_SINK(state->audiosink));
       if (sample)
       {
-        *audio_buf = gst_buffer_ref(gst_sample_get_buffer(sample));
-        gst_sample_unref(sample);
+        *audio_sample = sample;
         
+        GstClockTime time = gst_segment_to_running_time(gst_sample_get_segment(sample), GST_FORMAT_TIME, GST_BUFFER_PTS(gst_sample_get_buffer(sample)));
         GST_INFO("Got audio buffer: %" GST_TIME_FORMAT " duration %" GST_TIME_FORMAT,
-                 GST_TIME_ARGS((*audio_buf)->pts),
-                 GST_TIME_ARGS((*audio_buf)->duration));
+                 GST_TIME_ARGS(time),
+                 GST_TIME_ARGS(GST_BUFFER_DURATION(gst_sample_get_buffer(sample))));
       }
     }
     
@@ -513,15 +513,15 @@ bool loader_get_buffer(loader_t *state, GstBuffer **audio_buf,
       GstSample *sample = gst_app_sink_pull_sample(GST_APP_SINK(state->videosink));
       if (sample)
       {
-        *video_buf = gst_buffer_ref(gst_sample_get_buffer(sample));
-        gst_sample_unref(sample);
+        *video_sample = sample;
         
+        GstClockTime time = gst_segment_to_running_time(gst_sample_get_segment(sample), GST_FORMAT_TIME, GST_BUFFER_PTS(gst_sample_get_buffer(sample)));
         GST_INFO("Got video buffer: %" GST_TIME_FORMAT " duration %" GST_TIME_FORMAT,
-                 GST_TIME_ARGS((*video_buf)->pts),
-                 GST_TIME_ARGS((*video_buf)->duration));
+                 GST_TIME_ARGS(time),
+                 GST_TIME_ARGS(GST_BUFFER_DURATION(gst_sample_get_buffer(sample))));
       }
     }
-  } while (*audio_buf == NULL && *video_buf == NULL && *error == NULL);
+  } while (*audio_sample == NULL && *video_sample == NULL && *error == NULL);
   
   return true;
 }
