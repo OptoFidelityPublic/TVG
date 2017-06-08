@@ -421,7 +421,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   {
     filter->process->process_calibration_white(buf);
     
-    if ((int64_t)buffer_end_time >= filter->pre_white_duration * GST_MSECOND)
+    if ((gint64)buffer_end_time >= filter->pre_white_duration * GST_MSECOND)
     {
       if (filter->pre_marks_duration > 0)
       {
@@ -445,7 +445,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   {
     filter->process->process_calibration_marks(buf);
     
-    if ((int64_t)buffer_end_time >= (filter->pre_white_duration + filter->pre_marks_duration) * GST_MSECOND)
+    if ((gint64)buffer_end_time >= (filter->pre_white_duration + filter->pre_marks_duration) * GST_MSECOND)
     {
       if (!filter->only_calibration)
       {
@@ -519,7 +519,7 @@ static GstFlowReturn gst_oftvg_video_transform_ip(GstBaseTransform* object, GstB
   {
     filter->process->process_calibration_white(buf);
     
-    if ((int64_t)(buffer_end_time - filter->last_state_change) >= filter->post_white_duration * GST_MSECOND)
+    if ((gint64)(buffer_end_time - filter->last_state_change) >= filter->post_white_duration * GST_MSECOND)
     {
       filter->state = STATE_END;
     }
